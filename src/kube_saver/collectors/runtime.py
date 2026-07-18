@@ -10,9 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from kube_saver.collectors.ebpf import EbpfCollector, EbpfCollectionResult
+from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.metrics import MetricsCollector
-from kube_saver.collectors.runtime_models import AdvancedRuntimeMetrics, DiskIO, MemoryBreakdown, NetworkIO
+from kube_saver.collectors.runtime_models import (
+    AdvancedRuntimeMetrics,
+    DiskIO,
+    MemoryBreakdown,
+    NetworkIO,
+)
 from kube_saver.models.core import ActualUsage, MetricSource, PodResourceInfo
 
 

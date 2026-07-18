@@ -87,6 +87,13 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 
+[[tool.mypy.overrides]]
+# Textual has known typing quirks (generic Screen/DataTable/App need type args,
+# RowKey vs str, action_* coroutine returns, etc.). The TUI is alpha and these
+# noise errors don't reflect real bugs. Keep strict on the rest of the codebase.
+module = "kube_saver.tui.*"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

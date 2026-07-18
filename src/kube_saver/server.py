@@ -22,10 +22,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not found"})
 
-    def log_message(self, log_format: str, *args) -> None:  # noqa: A003
+    def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
 
-    def _send_json(self, status: int, payload: dict) -> None:
+    def _send_json(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -34,14 +34,18 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def build_server(report_builder: Callable[[], dict], host: str = "127.0.0.1", port: int = 8080) -> HTTPServer:
+def build_server(
+    report_builder: Callable[[], dict[str, object]],
+    host: str = "127.0.0.1",
+    port: int = 8080,
+) -> HTTPServer:
     """Create an HTTP server exposing kube-saver API endpoints."""
     server = HTTPServer((host, port), _Handler)
-    server.report_builder = report_builder
+    server.report_builder = report_builder  # type: ignore[attr-defined]
     return server
 
 
-def _openapi_stub() -> dict:
+def _openapi_stub() -> dict[str, object]:
     return {
         "openapi": "3.0.0",
         "info": {"title": "kube-saver API", "version": "0.1.0"},

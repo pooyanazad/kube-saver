@@ -1,6 +1,6 @@
 """Tests for kube-saver pricing engine."""
 
-from kube_saver.models.core import CloudProvider, CostInfo, ResourceWaste
+from kube_saver.models.core import CloudProvider, ResourceWaste
 from kube_saver.pricing.engine import PricingEngine, PricingRate
 
 

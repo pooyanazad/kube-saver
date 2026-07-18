@@ -16,7 +16,7 @@ class NotificationMessage:
     channel: str
     title: str
     text: str
-    payload: dict = field(default_factory=dict)
+    payload: dict[str, str] = field(default_factory=dict)
 
 
 class NotificationRateLimiter:

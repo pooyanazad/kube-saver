@@ -12,14 +12,10 @@ Screens:
 
 from __future__ import annotations
 
-import asyncio
-from typing import Optional
-
-from textual import on, work
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
-from textual.reactive import reactive
+from textual.containers import Container
 from textual.screen import Screen
 from textual.timer import Timer
 from textual.widget import Widget
@@ -27,16 +23,11 @@ from textual.widgets import (
     DataTable,
     Footer,
     Header,
-    Input,
-    Label,
-    LoadingIndicator,
-    RichLog,
     Static,
 )
 
 from kube_saver.config import KubeSaverConfig, load_config
 from kube_saver.tui.data import TUIData, load_data
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -694,11 +685,11 @@ class KubeSaverApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, config: Optional[KubeSaverConfig] = None) -> None:
+    def __init__(self, config: KubeSaverConfig | None = None) -> None:
         super().__init__()
         self.config = config or load_config()
         self._data = TUIData()
-        self._refresh_timer: Optional[Timer] = None
+        self._refresh_timer: Timer | None = None
 
     def on_mount(self) -> None:
         self.push_screen(Dashboard(self._data))

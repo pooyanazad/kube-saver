@@ -1,6 +1,10 @@
 from kube_saver.analyzers.cost_waste import CostWasteReport, NamespaceCostAnalysis
 from kube_saver.analyzers.resource_waste import NamespaceAnalysis, ResourceWasteReport
-from kube_saver.exporters.notifier import NotificationRateLimiter, build_daily_summary, build_spike_alert
+from kube_saver.exporters.notifier import (
+    NotificationRateLimiter,
+    build_daily_summary,
+    build_spike_alert,
+)
 from kube_saver.exporters.pr_generator import generate_pr_plan
 from kube_saver.models.core import CostInfo, NamespaceInfo, Recommendation
 

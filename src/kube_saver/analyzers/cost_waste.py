@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from kube_saver.analyzers.resource_waste import NamespaceAnalysis, ResourceWasteReport
+from kube_saver.analyzers.resource_waste import ResourceWasteReport
 from kube_saver.models.core import CostInfo, ResourceWaste
 from kube_saver.pricing.engine import PricingEngine
 

@@ -8,7 +8,14 @@ from kube_saver.analyzers.health import pod_health_score
 from kube_saver.analyzers.resource_waste import analyze_resource_waste
 from kube_saver.collectors.runtime import RuntimeCollector
 from kube_saver.config import AlertConfig
-from kube_saver.models.core import ActualUsage, CloudProvider, MetricSource, NamespaceInfo, PodResourceInfo, ResourceQuantities
+from kube_saver.models.core import (
+    ActualUsage,
+    CloudProvider,
+    MetricSource,
+    NamespaceInfo,
+    PodResourceInfo,
+    ResourceQuantities,
+)
 from kube_saver.pricing.engine import PricingEngine
 from kube_saver.recommenders.engine import generate_recommendations
 

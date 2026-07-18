@@ -3,7 +3,12 @@
 from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.ebpf_safety import check_ebpf_safety
 from kube_saver.collectors.runtime import RuntimeCollector
-from kube_saver.models.core import ActualUsage, MetricSource, PodResourceInfo, ResourceQuantities
+from kube_saver.models.core import (
+    ActualUsage,
+    MetricSource,
+    PodResourceInfo,
+    ResourceQuantities,
+)
 
 
 def _pod(name: str = "demo", namespace: str = "default") -> PodResourceInfo:

@@ -9,18 +9,24 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
+from kube_saver.analyzers.alerts import Alert, evaluate_alerts
+from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
+from kube_saver.analyzers.resource_waste import (
+    ResourceWasteReport,
+    analyze_resource_waste,
+)
 from kube_saver.collectors.k8s_client import K8sClient
 from kube_saver.collectors.runtime import RuntimeCollector
-from kube_saver.analyzers.resource_waste import ResourceWasteReport, analyze_resource_waste
-from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
-from kube_saver.analyzers.health import pod_health_score
-from kube_saver.analyzers.alerts import Alert, evaluate_alerts
-from kube_saver.recommenders.engine import generate_recommendations
-from kube_saver.models.core import CloudProvider, ClusterInfo, Recommendation, Currency, MetricSource
-from kube_saver.pricing.engine import PricingEngine
 from kube_saver.config import KubeSaverConfig
+from kube_saver.models.core import (
+    ClusterInfo,
+    Currency,
+    MetricSource,
+    Recommendation,
+)
+from kube_saver.pricing.engine import PricingEngine
+from kube_saver.recommenders.engine import generate_recommendations
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +36,17 @@ class TUIData:
     """All pre-computed data for the TUI screens."""
 
     connected: bool = False
-    error: Optional[str] = None
-    cluster: Optional[ClusterInfo] = None
-    resource_report: Optional[ResourceWasteReport] = None
-    cost_report: Optional[CostWasteReport] = None
+    error: str | None = None
+    cluster: ClusterInfo | None = None
+    resource_report: ResourceWasteReport | None = None
+    cost_report: CostWasteReport | None = None
     recommendations: list[Recommendation] = field(default_factory=list)
     alerts: list[Alert] = field(default_factory=list)
     currency: Currency = Currency.USD
     exchange_rate: float = 1.0
     metrics_available: bool = False
     metric_source: MetricSource = MetricSource.ESTIMATED
-    loaded_at: Optional[datetime] = None
+    loaded_at: datetime | None = None
     warnings: list[str] = field(default_factory=list)
 
 
@@ -102,10 +108,15 @@ def load_data(config: KubeSaverConfig) -> TUIData:
         except Exception as exc:
             logger.warning("Recommendations failed: %s", exc)
 
-        try:
-            data.alerts = evaluate_alerts(data.resource_report, data.cost_report, config.alerts)
-        except Exception as exc:
-            logger.warning("Alerts failed: %s", exc)
+        if data.cost_report is not None:
+            try:
+                data.alerts = evaluate_alerts(
+                    data.resource_report,
+                    data.cost_report,
+                    config.alerts,
+                )
+            except Exception as exc:
+                logger.warning("Alerts failed: %s", exc)
 
     data.connected = True
     data.loaded_at = datetime.now()

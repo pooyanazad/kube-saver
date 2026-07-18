@@ -97,7 +97,7 @@ def check_ebpf_safety() -> EbpfSafetyReport:
         report.warnings.append("tracefs/debugfs not available")
 
     try:
-        import bcc  # type: ignore[import-not-found,import-untyped]
+        import bcc  # type: ignore[import-not-found]
 
         _ = bcc
         report.bcc_available = True

@@ -33,8 +33,8 @@ try:
     _K8S_AVAILABLE = True
 except ImportError:
     _K8S_AVAILABLE = False
-    k8s_client = None  # type: ignore[assignment]
-    k8s_config = None  # type: ignore[assignment]
+    k8s_client = None
+    k8s_config = None
 
     class ApiException(Exception):  # type: ignore[no-redef]  # noqa: N818
         """Fallback when kubernetes is not installed."""
@@ -72,7 +72,7 @@ def _parse_memory_to_bytes(value: str | None) -> int:
     if not value:
         return 0
     value = str(value).strip()
-    units: dict[str, int] = {
+    units: dict[str, float] = {
         "Ki": 1024,
         "Mi": 1024**2,
         "Gi": 1024**3,
@@ -167,16 +167,16 @@ class K8sClient:
         logger.info("Kubeconfig loaded successfully")
 
     @property
-    def core(self) -> k8s_client.CoreV1Api:  # type: ignore[name-defined]
+    def core(self) -> k8s_client.CoreV1Api:
         if not self._connected:
             self.connect()
-        return self._core_api  # type: ignore[return-value]
+        return self._core_api
 
     @property
-    def apps(self) -> k8s_client.AppsV1Api:  # type: ignore[name-defined]
+    def apps(self) -> k8s_client.AppsV1Api:
         if not self._connected:
             self.connect()
-        return self._apps_api  # type: ignore[return-value]
+        return self._apps_api
 
     # ── High-level queries ────────────────────────────────────────────────
 
@@ -195,7 +195,7 @@ class K8sClient:
             version = "unknown"
 
         try:
-            nodes = self.core.list_node().items  # type: ignore[union-attr]
+            nodes = self.core.list_node().items
         except ApiException as exc:
             logger.warning("Cannot list nodes (RBAC?): %s", exc)
             nodes = []
@@ -204,7 +204,7 @@ class K8sClient:
         total_mem = 0
         for node in nodes:
             alloc = node.status.allocatable or {}
-            total_cpu += _parse_cpu_to_millicores(alloc.get("cpu"))
+            total_cpu += int(_parse_cpu_to_millicores(alloc.get("cpu")))
             total_mem += _parse_memory_to_bytes(alloc.get("memory"))
 
         context_name = self.context or "default"
@@ -224,7 +224,7 @@ class K8sClient:
         Respects ``namespace_filter`` and ``exclude_namespaces``.
         """
         try:
-            ns_list = self.core.list_namespace().items  # type: ignore[union-attr]
+            ns_list = self.core.list_namespace().items
         except ApiException as exc:
             logger.warning("Cannot list namespaces (RBAC?): %s", exc)
             return []
@@ -247,7 +247,7 @@ class K8sClient:
     def get_namespace_pod_count(self, namespace: str) -> int:
         """Count running pods in a namespace."""
         try:
-            pods = self.core.list_namespaced_pod(  # type: ignore[union-attr]
+            pods = self.core.list_namespaced_pod(
                 namespace, field_selector="status.phase=Running"
             )
             return len(pods.items)
@@ -262,19 +262,20 @@ class K8sClient:
         resource requests/limits from the pod spec.
         """
         try:
-            pods = self.core.list_namespaced_pod(namespace).items  # type: ignore[union-attr]
+            pods = self.core.list_namespaced_pod(namespace).items
         except ApiException as exc:
             logger.warning("Cannot list pods in %s: %s", namespace, exc)
             return []
 
         results: list[PodResourceInfo] = []
         for pod in pods:
-            pod_spec = pod.spec or {}
+            pod_spec = pod.spec if pod.spec is not None else None
             owner = pod.metadata.owner_references
             workload_kind = owner[0].kind if owner else "Pod"
             workload_name = owner[0].name if owner else pod.metadata.name
 
-            containers = pod_spec.containers or []
+            containers = pod_spec.containers if pod_spec is not None else None
+            containers = containers or []
             agg = ResourceQuantities()
             container_infos: list[ContainerResourceInfo] = []
 
@@ -297,7 +298,7 @@ class K8sClient:
                 PodResourceInfo(
                     name=pod.metadata.name,
                     namespace=namespace,
-                    node_name=pod_spec.node_name,
+                    node_name=pod_spec.node_name if pod_spec is not None else None,
                     workload_kind=workload_kind,
                     workload_name=workload_name,
                     containers=container_infos,
@@ -318,7 +319,7 @@ class K8sClient:
         """Map node name to list of pod names running on it."""
         node_pods: dict[str, list[str]] = {}
         try:
-            pods = self.core.list_pod_for_all_namespaces().items  # type: ignore[union-attr]
+            pods = self.core.list_pod_for_all_namespaces().items
         except ApiException as exc:
             logger.warning("Cannot list pods cluster-wide: %s", exc)
             return {}

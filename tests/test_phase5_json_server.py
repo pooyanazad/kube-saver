@@ -8,7 +8,6 @@ from kube_saver.models.core import CloudProvider, ClusterInfo, Recommendation
 from kube_saver.server import build_server
 
 
-
 def test_build_json_report() -> None:
     payload = build_json_report(
         cluster=ClusterInfo(name="demo", context="ctx", provider=CloudProvider.UNKNOWN),
