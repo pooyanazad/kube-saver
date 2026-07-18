@@ -16,7 +16,6 @@ Reference: AWS EKS pricing model (effective July 2026)
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from kube_saver.models.core import CloudProvider, CostInfo, ResourceWaste
 
@@ -152,9 +151,9 @@ class PricingEngine:
 
     def set_rate(
         self,
-        cpu_per_core_hour: Optional[float] = None,
-        memory_per_gb_hour: Optional[float] = None,
-        label: Optional[str] = None,
+        cpu_per_core_hour: float | None = None,
+        memory_per_gb_hour: float | None = None,
+        label: str | None = None,
     ) -> None:
         """Override individual pricing parameters at runtime."""
         cpu = cpu_per_core_hour if cpu_per_core_hour is not None else self.rate.cpu_per_core_hour_usd

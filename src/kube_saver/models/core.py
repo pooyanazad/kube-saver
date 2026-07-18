@@ -15,7 +15,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class CloudProvider(str, Enum):
@@ -201,7 +200,7 @@ class PodResourceInfo:
 
     name: str
     namespace: str = ""
-    node_name: Optional[str] = None
+    node_name: str | None = None
     workload_kind: str = "Unknown"
     workload_name: str = ""
     containers: list[ContainerResourceInfo] = field(default_factory=list)
@@ -326,7 +325,9 @@ class WasteReport:
         namespaces_breakdown: Per-namespace waste for ranked display.
     """
 
-    cluster: ClusterInfo = field(default_factory=ClusterInfo)
+    cluster: ClusterInfo = field(
+        default_factory=lambda: ClusterInfo(name="", context=""),
+    )
     generated_at: datetime = field(default_factory=datetime.now)
     total_pods: int = 0
     waste: ResourceWaste = field(default_factory=ResourceWaste)

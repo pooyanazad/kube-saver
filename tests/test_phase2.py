@@ -1,19 +1,19 @@
 """Tests for Phase 2 analysis engine."""
 
-from kube_saver.analyzers.resource_waste import analyze_resource_waste, ResourceWasteReport, PodWaste, NamespaceAnalysis
-from kube_saver.analyzers.cost_waste import analyze_cost_waste, CostWasteReport
-from kube_saver.analyzers.health import pod_health_score
 from kube_saver.analyzers.alerts import evaluate_alerts
+from kube_saver.analyzers.cost_waste import analyze_cost_waste
+from kube_saver.analyzers.health import pod_health_score
+from kube_saver.analyzers.resource_waste import PodWaste, analyze_resource_waste
 from kube_saver.config import AlertConfig
 from kube_saver.models.core import (
     ActualUsage,
+    CloudProvider,
     MetricSource,
     NamespaceInfo,
     PodResourceInfo,
     ResourceQuantities,
 )
 from kube_saver.pricing import PricingEngine
-from kube_saver.models.core import CloudProvider
 
 
 def _make_pod(

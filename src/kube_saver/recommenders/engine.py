@@ -5,10 +5,8 @@ Phase 2 — Step 11.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from kube_saver.analyzers.resource_waste import PodWaste, ResourceWasteReport
-from kube_saver.models.core import CostInfo, Recommendation
+from kube_saver.models.core import Recommendation
 from kube_saver.pricing.engine import PricingEngine
 
 

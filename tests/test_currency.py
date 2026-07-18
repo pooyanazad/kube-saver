@@ -1,10 +1,15 @@
 """Tests for currency and custom pricing."""
 
-from kube_saver.config import KubeSaverConfig, load_config, default_config_yaml
-from kube_saver.models.core import Currency, Money, ResourceWaste
+from kube_saver.config import KubeSaverConfig, default_config_yaml
+from kube_saver.models.core import (
+    CloudProvider,
+    CostInfo,
+    Currency,
+    Money,
+    ResourceWaste,
+)
 from kube_saver.pricing.display import convert_cost, format_yearly
 from kube_saver.pricing.engine import PricingEngine
-from kube_saver.models.core import CloudProvider, CostInfo
 
 
 def test_currency_symbols() -> None:

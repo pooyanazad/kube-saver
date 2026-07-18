@@ -38,48 +38,103 @@ kube-saver is a **terminal-based tool** that shows you real-time, exactly how mu
 
 - **k9s-style interactive TUI** — navigate clusters, namespaces, pods with keyboard
 - **Real cost visibility** — shows actual $ waste, not just resource waste
-- **eBPF-powered metrics** — captures real usage, not just metrics-server estimates
+- **Runtime source awareness** — uses eBPF when available, otherwise falls back to metrics-server or estimated data
 - **Smart recommendations** — suggests optimal resource requests/limits
-- **Safety guardrails** — never breaks production workloads
-- **GitOps integration** — generates PRs with optimized manifests
+- **Safety guardrails** — avoids unsafe recommendations by design
+- **Export and integration foundation** — YAML, Helm, PR planning, reports, JSON, Prometheus, and server mode
 
 ## Status
 
 **Work in progress** — see [STEPS.md](STEPS.md) (local only) for the roadmap.
 
-Current phase: **Foundation** (Steps 1-8 of 50)
+Current phase completed locally: **Phase 6 in progress**
 
-## Planned Features
+Implemented today:
+- Phase 1 foundation
+- Phase 2 analyzers and recommendations
+- Phase 3 TUI
+- Phase 4 runtime collector fallback chain
+- Phase 5 exporter and integration MVPs
+- Phase 6 test suite and CI setup
 
-- [ ] Multi-cluster cost dashboard
-- [ ] eBPF-based real-time metrics
-- [ ] Smart resource recommendations
-- [ ] YAML/Helm export with GitOps PR generation
-- [ ] Slack/Teams/Prometheus integrations
-- [ ] HTML reports for management
+## Current Features
+
+- Interactive TUI dashboard via `python -m kube_saver.cli`
+- Cluster, namespace, and pod waste analysis
+- Monthly and yearly cost estimation
+- Multi-currency display
+- Custom CPU and memory pricing
+- Runtime metric fallback chain:
+  - eBPF
+  - metrics-server
+  - estimated data
+- YAML exporter
+- Helm values exporter
+- PR plan generator
+- Slack/Teams notification payload builders
+- Prometheus metrics formatter
+- HTML report generator
+- JSON output builder
+- Basic HTTP API server mode
 
 ## Installation
 
+### Local development install
+
 ```bash
-pip install kube-saver
+git clone https://github.com/pooyanazad/kube-saver.git
+cd kube-saver
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
 ```
 
-_(Not yet available — under development)_
+### Minimal install
+
+```bash
+pip install -e .
+```
+
+### Optional eBPF support
+
+```bash
+pip install -e .[ebpf]
+```
+
+> Note: eBPF support also depends on host kernel capabilities and BCC availability.
 
 ## Quick Start
 
+### Launch the TUI
+
 ```bash
-# Launch TUI against current kubeconfig context
-kube-saver
-
-# Generate waste report
-kube-saver report
-
-# Get optimization recommendations
-kube-saver recommend
+source .venv/bin/activate
+python3 -m kube_saver.cli
 ```
 
-_(Not yet implemented)_
+### Generate default config YAML
+
+```bash
+python3 -c "from kube_saver.config import default_config_yaml; print(default_config_yaml())"
+```
+
+### Use JSON output helpers in automation
+
+```bash
+python3 - <<'PY2'
+from kube_saver.exporters.json_output import build_json_report
+print(build_json_report(cluster=None, resource_report=None, cost_report=None, recommendations=[]))
+PY2
+```
+
+### Run the basic API server
+
+```python
+from kube_saver.server import build_server
+
+server = build_server(lambda: {"status": "ok"}, port=8080)
+server.serve_forever()
+```
 
 ## Configuration
 
@@ -101,13 +156,6 @@ export KUBE_SAVER_CURRENCY=eur
 export KUBE_SAVER_EXCHANGE_RATE_FROM_USD=0.92
 ```
 
-Output then shows your numbers in euros:
-
-```
-Total waste cost/month:     €57.04 EUR
-Annual waste estimate:      €684.45 EUR
-```
-
 ### Change CPU or memory price
 
 ```yaml
@@ -123,23 +171,117 @@ export KUBE_SAVER_CPU_PER_CORE=0.05
 export KUBE_SAVER_MEM_PER_GB=0.006
 ```
 
-### Generate a starter config
+### Other useful config sections
 
-```bash
-python3 -c "from kube_saver.config import default_config_yaml; print(default_config_yaml())"
+```yaml
+cloud_provider: aws
+provider_tier: general
+exclude_namespaces:
+  - kube-system
+  - kube-public
+alerts:
+  warning_waste_ratio: 0.4
+  critical_waste_ratio: 0.8
+  warning_monthly_usd: 100
+  critical_monthly_usd: 500
+export:
+  output_directory: ./kube-saver-exports
+  dry_run: true
+tui:
+  refresh_interval_seconds: 30
+  compact_mode: false
 ```
 
-## Why?
+## Architecture
 
-Because **100% of Kubernetes clusters waste money**, and there is **no good tool** to show teams exactly how much. We combine:
+High-level flow:
 
-- **Linux kernel power** (eBPF) for accurate metrics
-- **Python ecosystem** for fast iteration
-- **DevOps experience** for building tools DevOps engineers actually need
+1. **Collectors** gather cluster state and runtime data
+2. **Analyzers** compute waste and health
+3. **Pricing engine** converts waste to cost
+4. **Recommendation engine** proposes safer resource values
+5. **TUI and exporters** present the results
+
+Main modules:
+
+- `collectors/` — Kubernetes, metrics-server, runtime fallback, eBPF safety
+- `analyzers/` — waste, cost, health, alerts
+- `pricing/` — rates and currency display
+- `recommenders/` — rightsizing suggestions
+- `tui/` — Textual app and data loading
+- `exporters/` — YAML, Helm, JSON, Prometheus, HTML, notifications, PR plan
+- `server.py` — basic HTTP API mode
+
+## Troubleshooting
+
+### TUI opens but metrics are estimated
+
+This usually means:
+- metrics-server is not available, or
+- eBPF is unavailable, so kube-saver fell back
+
+Phase 4 intentionally degrades safely instead of crashing.
+
+### eBPF is not being used
+
+Common reasons:
+- Python BCC bindings are not installed
+- host kernel capabilities are missing
+- tracefs/debugfs is unavailable
+- root or extra capabilities may be required
+
+### Kubernetes connection fails
+
+Check:
+- your kubeconfig context
+- cluster reachability
+- RBAC permissions
+- whether the current environment should use kubeconfig or in-cluster config
+
+### Tests
+
+Run all tests:
+
+```bash
+source .venv/bin/activate
+pytest tests -q
+```
+
+Run with coverage:
+
+```bash
+source .venv/bin/activate
+pytest tests --cov=src/kube_saver --cov-report=term-missing -q
+```
 
 ## Contributing
 
-Contributions welcome! This is an early-stage project. See `STEPS.md` (local planning doc) for the full roadmap.
+Contributions are welcome.
+
+Suggested local workflow:
+
+```bash
+git checkout -b my-change
+source .venv/bin/activate
+pytest tests -q
+ruff check src tests
+mypy src
+```
+
+Please keep changes small, tested, and focused.
+
+## CI/CD
+
+GitHub Actions now runs:
+- Ruff
+- Mypy
+- Pytest
+- package build
+- tagged release and Docker jobs
+
+## Why?
+
+Because **Kubernetes waste is real money**, and teams need a fast terminal tool to see it clearly.
 
 ## License
 
