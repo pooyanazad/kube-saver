@@ -56,10 +56,14 @@ def main() -> None:
 
     cost_report = analyze_cost_waste(resource_report, pricing)
 
+    currency = config.currency
+    rate = config.exchange_rate_from_usd
+    sym = currency.symbol
+
     console.print(f"\n[bold]Cost Waste Summary[/bold]")
-    console.print(f"  Total requested cost/month: ${cost_report.total_requested_cost.monthly_usd:.2f}")
-    console.print(f"  Total waste cost/month:     ${cost_report.total_cost_waste.monthly_usd:.2f}")
-    console.print(f"  Annual waste estimate:      ${cost_report.total_cost_waste.yearly_usd:.2f}")
+    console.print(f"  Total requested cost/month: {sym}{cost_report.total_requested_cost.monthly_usd * rate:.2f} {currency.code}")
+    console.print(f"  Total waste cost/month:     {sym}{cost_report.total_cost_waste.monthly_usd * rate:.2f} {currency.code}")
+    console.print(f"  Annual waste estimate:      {sym}{cost_report.total_cost_waste.yearly_usd * rate:.2f} {currency.code}")
     console.print(f"  Waste ratio:                {cost_report.waste_ratio:.1%}")
 
     if cost_report.namespaces:
@@ -68,7 +72,7 @@ def main() -> None:
         ns_table.add_column("Pods", justify="right")
         ns_table.add_column("CPU Waste", justify="right")
         ns_table.add_column("Mem Waste", justify="right")
-        ns_table.add_column("$/month", justify="right")
+        ns_table.add_column(f"/month ({currency.code})", justify="right")
         ns_table.add_column("Efficiency", justify="right")
 
         for ns in cost_report.namespaces:
@@ -81,7 +85,7 @@ def main() -> None:
                 str(pod_count),
                 f"{ns.cpu_waste_millicores:.0f}m",
                 f"{ns.memory_waste_bytes / 1024**2:.0f}Mi",
-                f"${ns.cost_waste.monthly_usd:.2f}",
+                f"{sym}{ns.cost_waste.monthly_usd * rate:.2f}",
                 f"{ns.efficiency_score:.1f}%",
             )
 
@@ -96,13 +100,17 @@ def main() -> None:
         alert_table.add_column("Message")
         for alert in alerts:
             style = "red" if alert.level == "critical" else "yellow"
-            alert_table.add_row(Text(alert.level, style=style), alert.scope, alert.target, alert.message)
+            msg = alert.message
+            if "Monthly waste" in msg:
+                msg = msg.replace("$", sym)
+            alert_table.add_row(Text(alert.level, style=style), alert.scope, alert.target, msg)
         console.print(alert_table)
     else:
         console.print("[green]No alerts triggered.[/green]")
 
     from kube_saver.recommenders.engine import generate_recommendations
     recs = generate_recommendations(resource_report, pricing)
+
     if recs:
         rec_table = Table(title=f"Top Recommendations ({len(recs)} total)")
         rec_table.add_column("Target", style="cyan")
@@ -110,7 +118,7 @@ def main() -> None:
         rec_table.add_column("Current", justify="right")
         rec_table.add_column("Suggested", justify="right")
         rec_table.add_column("Confidence")
-        rec_table.add_column("$/month", justify="right")
+        rec_table.add_column(f"/month ({currency.code})", justify="right")
         for rec in recs[:10]:
             rec_table.add_row(
                 f"{rec.target_namespace}/{rec.target_name}",
@@ -118,13 +126,15 @@ def main() -> None:
                 rec.current_value,
                 rec.suggested_value,
                 rec.confidence,
-                f"${rec.estimated_savings.monthly_usd:.2f}",
+                f"{sym}{rec.estimated_savings.monthly_usd * rate:.2f}",
             )
         console.print(rec_table)
     else:
         console.print("[green]No recommendations — cluster looks healthy![/green]")
 
-    console.print(f"\n[dim]Analysis complete. kube-saver v0.2.0-dev[/dim]\n")
+    console.print(f"\n[dim]Analysis complete. kube-saver v0.2.0-dev | currency: {currency.code} (rate {rate})[/dim]\n")
+
+
 
 
 if __name__ == "__main__":
