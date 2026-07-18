@@ -57,4 +57,6 @@ def test_generate_html_report() -> None:
     assert "kube-saver executive summary" in report.html
     assert "nginx-wasteful" in report.html
     assert "$61.98" in report.html
-    assert report.pdf_supported is False
+    # Charts should be present for non-empty namespace data
+    assert "Cost Waste by Namespace" in report.html
+    assert "Efficiency by Namespace" in report.html
