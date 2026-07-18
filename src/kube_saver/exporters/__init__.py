@@ -6,6 +6,7 @@ from kube_saver.exporters.notifier import (
     NotificationRateLimiter,
     build_daily_summary,
     build_spike_alert,
+    write_notification,
 )
 from kube_saver.exporters.pr_generator import PullRequestPlan, generate_pr_plan
 from kube_saver.exporters.prometheus import render_prometheus_metrics
@@ -35,4 +36,5 @@ __all__ = [
     "generate_html_report",
     "generate_pr_plan",
     "render_prometheus_metrics",
+    "write_notification",
 ]
