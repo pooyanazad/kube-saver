@@ -97,10 +97,21 @@ def _parse_memory_to_bytes(value: Optional[str]) -> int:
         return 0
 
 
-def _extract_resource_quantities(resource_spec: dict) -> ResourceQuantities:
-    """Extract request/limit ResourceQuantities from a container spec dict."""
-    requests = resource_spec.get("requests", {})
-    limits = resource_spec.get("limits", {})
+def _extract_resource_quantities(resource_spec: object) -> ResourceQuantities:
+    """Extract request/limit ResourceQuantities from a container resource spec.
+
+    Supports both plain dicts and kubernetes.client.V1ResourceRequirements
+    objects returned by the official client.
+    """
+    if resource_spec is None:
+        requests = {}
+        limits = {}
+    elif isinstance(resource_spec, dict):
+        requests = resource_spec.get("requests", {})
+        limits = resource_spec.get("limits", {})
+    else:
+        requests = getattr(resource_spec, "requests", None) or {}
+        limits = getattr(resource_spec, "limits", None) or {}
     return ResourceQuantities(
         cpu_millicores_request=_parse_cpu_to_millicores(requests.get("cpu")),
         cpu_millicores_limit=_parse_cpu_to_millicores(limits.get("cpu")),
@@ -144,13 +155,12 @@ class K8sClient:
                 "The 'kubernetes' package is required. "
                 "Install it with: pip install kube-saver"
             )
-        if self.context:
-            k8s_config.load_kube_config(context=self.context)
-        else:
-            try:
-                k8s_config.load_incluster_config()
-            except k8s_config.ConfigException:
-                k8s_config.load_kube_config()
+        try:
+            k8s_config.load_kube_config(context=self.context or None)
+        except k8s_config.ConfigException:
+            if self.context:
+                raise
+            k8s_config.load_incluster_config()
         self._core_api = k8s_client.CoreV1Api()
         self._apps_api = k8s_client.AppsV1Api()
         self._connected = True
@@ -176,8 +186,13 @@ class K8sClient:
         Returns a ``ClusterInfo`` with the sum of allocatable CPU and memory
         across all worker nodes.
         """
-        version_info = self.core.get_server_version()  # type: ignore[union-attr]
-        version = version_info.git_version or "unknown"
+        version = "unknown"
+        try:
+            version_api = k8s_client.VersionApi()
+            version_info = version_api.get_code()
+            version = getattr(version_info, "git_version", None) or "unknown"
+        except Exception:
+            version = "unknown"
 
         try:
             nodes = self.core.list_node().items  # type: ignore[union-attr]

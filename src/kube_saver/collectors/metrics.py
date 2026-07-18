@@ -91,11 +91,11 @@ class MetricsCollector:
             logger.info("kubernetes package not installed — using estimated metrics")
             return {}
 
-        core_api = k8s_client.CoreV1Api()
+        custom_api = k8s_client.CustomObjectsApi()
 
         if namespace:
             try:
-                metrics = core_api.list_namespaced_custom_object(
+                metrics = custom_api.list_namespaced_custom_object(
                     group="metrics.k8s.io",
                     version="v1beta1",
                     namespace=namespace,
@@ -112,7 +112,7 @@ class MetricsCollector:
                 return {}
         else:
             try:
-                metrics = core_api.list_cluster_custom_object(
+                metrics = custom_api.list_cluster_custom_object(
                     group="metrics.k8s.io",
                     version="v1beta1",
                     plural="pods",
