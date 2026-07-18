@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kube-saver"
+version = "0.1.0"
+description = "k9s-style TUI that shows you exactly where your Kubernetes money goes"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "pooyanazad" },
+]
+keywords = [
+    "kubernetes",
+    "k8s",
+    "devops",
+    "cost-optimization",
+    "eBPF",
+    "tui",
+    "terminal",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "textual>=0.40.0,<1.0.0",
+    "rich>=13.0.0,<14.0.0",
+    "click>=8.0.0,<9.0.0",
+    "kubernetes>=28.0.0,<31.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
+    "httpx>=0.25.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+ebpf = [
+    "bcc>=0.24.0,<1.0.0",
+]
+dev = [
+    "pytest>=7.0.0,<9.0.0",
+    "pytest-cov>=4.0.0,<6.0.0",
+    "pytest-asyncio>=0.21.0,<1.0.0",
+    "mypy>=1.0.0,<2.0.0",
+    "ruff>=0.1.0,<1.0.0",
+]
+all = [
+    "kube-saver[ebpf,dev]",
+]
+
+[project.scripts]
+kube-saver = "kube_saver.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/pooyanazad/kube-saver"
+Repository = "https://github.com/pooyanazad/kube-saver"
+Issues = "https://github.com/pooyanazad/kube-saver/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kube_saver"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
