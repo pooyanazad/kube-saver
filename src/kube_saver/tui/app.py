@@ -152,11 +152,14 @@ class Dashboard(Screen):
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
         table.add_columns(
             "Namespace", "Pods", "CPU Waste", "Mem Waste",
             f"Waste/{_code(self.data)}", "Efficiency", "Score"
         )
         self._populate_table(table)
+        table.focus()
 
     def _populate_table(self, table: DataTable, filter_text: str = "") -> None:
         table.clear()
@@ -229,7 +232,8 @@ class Dashboard(Screen):
         bar = self.query_one("#search_bar", Static)
         bar.toggle_class("show")
         if bar.has_class("show"):
-            bar.update("[dim]Type to filter… press Esc to clear[/dim]")
+            current = self._filter or ""
+            bar.update(f"[dim]Filter namespaces:[/] {current}")
         else:
             self._filter = ""
             self._refresh_table()
@@ -247,10 +251,12 @@ class Dashboard(Screen):
                 event.stop()
             elif event.key == "backspace":
                 self._filter = self._filter[:-1]
+                bar.update(f"[dim]Filter namespaces:[/] {self._filter}")
                 self._refresh_table()
                 event.stop()
             elif len(event.character or "") == 1 and event.character.isprintable():
                 self._filter += event.character
+                bar.update(f"[dim]Filter namespaces:[/] {self._filter}")
                 self._refresh_table()
                 event.stop()
 
@@ -308,11 +314,14 @@ class NamespaceDetail(Screen):
 
     def on_mount(self) -> None:
         table = self.query_one("#pod_table", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
         table.add_columns(
             "Pod", "Workload", "CPU Req", "CPU Actual", "CPU Waste",
             "Mem Req", "Mem Actual", "Mem Waste", "Restarts"
         )
         self._populate(table)
+        table.focus()
 
     def _populate(self, table: DataTable) -> None:
         d = self.data
@@ -502,6 +511,8 @@ class RecommendationsView(Screen):
 
     def on_mount(self) -> None:
         table = self.query_one("#rec_table", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
         table.add_columns(
             "Target", "Type", "Current", "Suggested", "Confidence", "Savings/mo", "Reason"
         )
@@ -518,6 +529,7 @@ class RecommendationsView(Screen):
                 f"{sym}{rec.estimated_savings.monthly_usd * d.exchange_rate:.2f}",
                 rec.reason,
             )
+        table.focus()
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
@@ -594,6 +606,8 @@ class CostDashboard(Screen):
 
     def on_mount(self) -> None:
         table = self.query_one("#cost_table", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
         table.add_columns(
             "Namespace", "Pods", "CPU Waste", "Mem Waste",
             "Waste/mo", "Efficiency"
@@ -617,6 +631,7 @@ class CostDashboard(Screen):
                 f"{sym}{ns.cost_waste.monthly_usd * d.exchange_rate:.2f}",
                 f"[{_eff_color(eff)}]{eff:.0f}%[/]",
             )
+        table.focus()
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
