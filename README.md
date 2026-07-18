@@ -9,15 +9,15 @@
 
 ```
 ┌─ kube-saver ─────────────────────────────────────────────────────┐
-│ Cluster: prod-us-east-1  │ Provider: AWS  │ CPU: 124/400 cores  │
+│ Cluster: prod-us-east-1  │ Provider: AWS  │ CPU: 124/400 cores   │
 ├──────────────────────────────────────────────────────────────────┤
-│ Total Monthly Waste: $2,847  │  Efficiency: 42%  │  Pods: 312   │
+│ Total Monthly Waste: $2,847  │  Efficiency: 42%  │  Pods: 312    │
 ├──────────────────────────────────────────────────────────────────┤
-│ Namespace          CPU Waste    Mem Waste    Monthly $   Score  │
-│ default            45.2 cores   98 GB        $1,247     ██░░ 34 │
-│ payments           12.8 cores   34 GB        $    642   ███░ 51 │
-│ analytics           8.1 cores   22 GB        $    418   ███░ 58 │
-│ staging             3.2 cores    9 GB        $    312   ████ 72 │
+│ Namespace          CPU Waste    Mem Waste    Monthly $   Score   │
+│ default            45.2 cores   98 GB        $1,247     ██░░ 34  │
+│ payments           12.8 cores   34 GB        $    642   ███░ 51  │
+│ analytics           8.1 cores   22 GB        $    418   ███░ 58  │
+│ staging             3.2 cores    9 GB        $    312   ████ 72  │
 │ monitoring          0.8 cores    2 GB        $     89   █████ 91 │
 └──────────────────────────────────────────────────────────────────┘
 ```
