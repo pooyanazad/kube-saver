@@ -147,8 +147,15 @@ class Dashboard(Screen):
         d = self.data
         ts = d.loaded_at.strftime("%H:%M:%S") if d.loaded_at else "never"
         conn = "[green]connected[/green]" if d.connected else "[red]disconnected[/red]"
-        metrics = "[green]metrics-server[/green]" if d.metrics_available else "[yellow]estimated[/yellow]"
-        return f"  kube-saver v0.2.0-dev │ {conn} │ {metrics} │ updated {ts} │ {d.currency.code}"
+        metric_source = d.metric_source.value if hasattr(d, "metric_source") else "estimated"
+        if metric_source == "ebpf":
+            metrics = "[green]eBPF[/green]"
+        elif metric_source == "metrics-server":
+            metrics = "[green]metrics-server[/green]"
+        else:
+            metrics = "[yellow]estimated[/yellow]"
+        warn = " [yellow]fallback[/yellow]" if getattr(d, "warnings", []) else ""
+        return f"  kube-saver v0.2.0-dev │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)

@@ -12,13 +12,13 @@ from datetime import datetime
 from typing import Optional
 
 from kube_saver.collectors.k8s_client import K8sClient
-from kube_saver.collectors.metrics import MetricsCollector
+from kube_saver.collectors.runtime import RuntimeCollector
 from kube_saver.analyzers.resource_waste import ResourceWasteReport, analyze_resource_waste
 from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
 from kube_saver.analyzers.health import pod_health_score
 from kube_saver.analyzers.alerts import Alert, evaluate_alerts
 from kube_saver.recommenders.engine import generate_recommendations
-from kube_saver.models.core import CloudProvider, ClusterInfo, Recommendation, Currency
+from kube_saver.models.core import CloudProvider, ClusterInfo, Recommendation, Currency, MetricSource
 from kube_saver.pricing.engine import PricingEngine
 from kube_saver.config import KubeSaverConfig
 
@@ -39,7 +39,9 @@ class TUIData:
     currency: Currency = Currency.USD
     exchange_rate: float = 1.0
     metrics_available: bool = False
+    metric_source: MetricSource = MetricSource.ESTIMATED
     loaded_at: Optional[datetime] = None
+    warnings: list[str] = field(default_factory=list)
 
 
 def load_data(config: KubeSaverConfig) -> TUIData:
@@ -69,13 +71,11 @@ def load_data(config: KubeSaverConfig) -> TUIData:
         logger.warning("Cluster read failed: %s", exc)
         return data
 
-    metrics = MetricsCollector()
-    try:
-        metrics.collect_all_pods(pods)
-    except Exception:
-        pass
-
-    data.metrics_available = bool(metrics.available)
+    runtime = RuntimeCollector(prefer_ebpf=True)
+    runtime_result = runtime.collect_all_pods(pods)
+    data.metrics_available = runtime_result.metrics_available
+    data.metric_source = runtime_result.source
+    data.warnings.extend(runtime_result.warnings)
 
     try:
         data.resource_report = analyze_resource_waste(

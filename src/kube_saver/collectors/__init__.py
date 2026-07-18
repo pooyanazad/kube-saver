@@ -1,11 +1,26 @@
-"""kube-saver collectors — data collection from K8s API and eBPF.
+"""kube-saver collectors — data collection from K8s API, metrics-server, and eBPF.
 
 Submodules:
-    k8s_client   - Kubernetes API wrapper (namespaces, pods, nodes)
-    metrics      - metrics-server integration for actual usage data
+    k8s_client    - Kubernetes API wrapper (namespaces, pods, nodes)
+    metrics       - metrics-server integration for actual usage data
+    runtime       - unified runtime collector with fallback chain
+    ebpf          - eBPF collector integration layer
+    ebpf_safety   - kernel/capability safety checks for eBPF
 """
 
+from kube_saver.collectors.ebpf import EbpfCollector, EbpfCollectionResult
+from kube_saver.collectors.ebpf_safety import EbpfSafetyReport, check_ebpf_safety
 from kube_saver.collectors.k8s_client import K8sClient
 from kube_saver.collectors.metrics import MetricsCollector
+from kube_saver.collectors.runtime import RuntimeCollector, RuntimeCollectionResult
 
-__all__ = ["K8sClient", "MetricsCollector"]
+__all__ = [
+    "EbpfCollector",
+    "EbpfCollectionResult",
+    "EbpfSafetyReport",
+    "K8sClient",
+    "MetricsCollector",
+    "RuntimeCollector",
+    "RuntimeCollectionResult",
+    "check_ebpf_safety",
+]
