@@ -10,7 +10,7 @@ from kube_saver.exporters.notifier import (
     build_spike_alert,
     write_notification,
 )
-from kube_saver.exporters.pr_generator import generate_pr_plan
+from kube_saver.exporters.pr_generator import apply_plan_locally, generate_pr_plan
 from kube_saver.models.core import CostInfo, NamespaceInfo, Recommendation
 
 
@@ -55,11 +55,23 @@ def _cost_report(monthly: float = 123.45) -> CostWasteReport:
 
 
 def test_generate_pr_plan_dry_run() -> None:
-    plan = generate_pr_plan(_recommendations(), provider="github", dry_run=True)
-    assert plan.provider == "github"
+    plan = generate_pr_plan(_recommendations())
     assert plan.dry_run is True
-    assert "500m -> 150m" in plan.body
+    assert "500m" in plan.body
+    assert "150m" in plan.body
     assert plan.branch_name.startswith("kube-saver/")
+    assert "summary.md" in plan.files
+    assert "apply-patches.sh" in plan.files
+
+
+def test_apply_plan_locally(tmp_path: Path) -> None:
+    plan = generate_pr_plan(_recommendations())
+    out = apply_plan_locally(plan, output_dir=tmp_path)
+    assert (out / "summary.md").exists()
+    assert (out / "apply-patches.sh").exists()
+    assert (out / "README.md").exists()
+    content = (out / "summary.md").read_text()
+    assert "150m" in content
 
 
 
