@@ -7,7 +7,7 @@ through these well-defined types.
 Units:
 - CPU is always in millicores (1000m = 1 full core)
 - Memory is always in bytes
-- Currency is always in USD
+- Currency is configurable (default USD)
 """
 
 from __future__ import annotations
@@ -35,6 +35,56 @@ class MetricSource(str, Enum):
     EBPF = "ebpf"
     CADVISOR = "cAdvisor"
     ESTIMATED = "estimated"
+
+
+class Currency(str, Enum):
+    """Supported currencies for cost display."""
+
+    USD = "usd"
+    EUR = "eur"
+    GBP = "gbp"
+    AED = "aed"
+    JPY = "jpy"
+    INR = "inr"
+
+    @property
+    def symbol(self) -> str:
+        """Return the currency symbol for display."""
+        symbols = {
+            Currency.USD: "$",
+            Currency.EUR: "€",
+            Currency.GBP: "£",
+            Currency.AED: "د.إ",
+            Currency.JPY: "¥",
+            Currency.INR: "₹",
+        }
+        return symbols[self]
+
+    @property
+    def code(self) -> str:
+        """Return the ISO currency code."""
+        return self.value.upper()
+
+
+@dataclass
+class Money:
+    """A currency-aware amount for display."""
+
+    amount: float = 0.0
+    currency: Currency = Currency.USD
+
+    @property
+    def formatted(self) -> str:
+        """Return formatted string like '$62.05' or '€57.09'."""
+        return f"{self.currency.symbol}{self.amount:.2f}"
+
+    @property
+    def yearly_formatted(self) -> str:
+        """Return yearly formatted string."""
+        return f"{self.currency.symbol}{self.amount * 12:.2f}"
+
+    def __repr__(self) -> str:
+        return self.formatted
 
 
 @dataclass

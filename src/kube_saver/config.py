@@ -26,7 +26,7 @@ try:
 except ImportError:
     _YAML_AVAILABLE = False
 
-from kube_saver.models.core import CloudProvider
+from kube_saver.models.core import CloudProvider, Currency
 from kube_saver.pricing.engine import PricingRate
 
 logger = logging.getLogger(__name__)
@@ -137,6 +137,8 @@ class KubeSaverConfig:
 
     cloud_provider: CloudProvider = CloudProvider.UNKNOWN
     provider_tier: str = "general"
+    currency: Currency = Currency.USD
+    exchange_rate_from_usd: float = 1.0
     namespace_filter: list[str] = field(default_factory=list)
     exclude_namespaces: set[str] = field(default_factory=lambda: {
         "kube-system", "kube-public", "kube-node-lease",
@@ -177,6 +179,14 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         provider = CloudProvider(provider_str.lower())
     except ValueError:
         provider = CloudProvider.UNKNOWN
+
+    currency_str = raw.get("currency", "usd")
+    try:
+        currency = Currency(currency_str.lower())
+    except ValueError:
+        currency = Currency.USD
+
+    exchange_rate = float(raw.get("exchange_rate_from_usd", 1.0))
 
     exclude = raw.get("exclude_namespaces", [
         "kube-system", "kube-public", "kube-node-lease",
@@ -224,6 +234,8 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
     return KubeSaverConfig(
         cloud_provider=provider,
         provider_tier=raw.get("provider_tier", "general"),
+        currency=currency,
+        exchange_rate_from_usd=exchange_rate,
         namespace_filter=raw.get("namespace_filter", []),
         exclude_namespaces=set(exclude),
         kubeconfig_context=raw.get("kubeconfig_context"),
@@ -257,6 +269,13 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
             cfg.cloud_provider = CloudProvider(v.lower())
         except ValueError:
             pass
+    if (v := _env("CURRENCY")) is not None:
+        try:
+            cfg.currency = Currency(v.lower())
+        except ValueError:
+            pass
+    if (v := _env("EXCHANGE_RATE_FROM_USD")) is not None:
+        cfg.exchange_rate_from_usd = float(v)
     if (v := _env("TIER")) is not None:
         cfg.provider_tier = v
     if (v := _env("CONTEXT")) is not None:
@@ -331,6 +350,8 @@ def default_config_yaml() -> str:
     data: dict[str, Any] = {
         "cloud_provider": default.cloud_provider.value,
         "provider_tier": default.provider_tier,
+        "currency": default.currency.value,
+        "exchange_rate_from_usd": default.exchange_rate_from_usd,
         "kubeconfig_context": None,
         "namespace_filter": [],
         "exclude_namespaces": sorted(default.exclude_namespaces),
