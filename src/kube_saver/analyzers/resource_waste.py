@@ -12,14 +12,10 @@ and aggregates results per pod, per deployment, and per namespace.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from kube_saver.models.core import (
-    ActualUsage,
     NamespaceInfo,
     PodResourceInfo,
-    ResourceQuantities,
-    ResourceWaste,
 )
 
 

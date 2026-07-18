@@ -12,14 +12,10 @@ Screens:
 
 from __future__ import annotations
 
-import asyncio
-from typing import Optional
-
-from textual import on, work
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
-from textual.reactive import reactive
+from textual.containers import Container
 from textual.screen import Screen
 from textual.timer import Timer
 from textual.widget import Widget
@@ -27,16 +23,11 @@ from textual.widgets import (
     DataTable,
     Footer,
     Header,
-    Input,
-    Label,
-    LoadingIndicator,
-    RichLog,
     Static,
 )
 
 from kube_saver.config import KubeSaverConfig, load_config
 from kube_saver.tui.data import TUIData, load_data
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -147,8 +138,15 @@ class Dashboard(Screen):
         d = self.data
         ts = d.loaded_at.strftime("%H:%M:%S") if d.loaded_at else "never"
         conn = "[green]connected[/green]" if d.connected else "[red]disconnected[/red]"
-        metrics = "[green]metrics-server[/green]" if d.metrics_available else "[yellow]estimated[/yellow]"
-        return f"  kube-saver v0.2.0-dev │ {conn} │ {metrics} │ updated {ts} │ {d.currency.code}"
+        metric_source = d.metric_source.value if hasattr(d, "metric_source") else "estimated"
+        if metric_source == "ebpf":
+            metrics = "[green]eBPF[/green]"
+        elif metric_source == "metrics-server":
+            metrics = "[green]metrics-server[/green]"
+        else:
+            metrics = "[yellow]estimated[/yellow]"
+        warn = " [yellow]fallback[/yellow]" if getattr(d, "warnings", []) else ""
+        return f"  kube-saver v0.2.0-dev │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)
@@ -687,11 +685,11 @@ class KubeSaverApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, config: Optional[KubeSaverConfig] = None) -> None:
+    def __init__(self, config: KubeSaverConfig | None = None) -> None:
         super().__init__()
         self.config = config or load_config()
         self._data = TUIData()
-        self._refresh_timer: Optional[Timer] = None
+        self._refresh_timer: Timer | None = None
 
     def on_mount(self) -> None:
         self.push_screen(Dashboard(self._data))
