@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 from kube_saver.models.core import (
     CloudProvider,
@@ -27,7 +26,8 @@ logger = logging.getLogger(__name__)
 # ── Kubernetes API imports (lazy so the module can be imported even without
 # the kubernetes package installed — useful for unit tests). ────────────────
 try:
-    from kubernetes import client as k8s_client, config as k8s_config  # type: ignore[import-untyped]
+    from kubernetes import client as k8s_client  # type: ignore[import-untyped]
+    from kubernetes import config as k8s_config
     from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
 
     _K8S_AVAILABLE = True
@@ -36,14 +36,14 @@ except ImportError:
     k8s_client = None  # type: ignore[assignment]
     k8s_config = None  # type: ignore[assignment]
 
-    class ApiException(Exception):  # type: ignore[no-redef]
+    class ApiException(Exception):  # type: ignore[no-redef]  # noqa: N818
         """Fallback when kubernetes is not installed."""
         pass
 
 
 # ── Parsing helpers ────────────────────────────────────────────────────────
 
-def _parse_cpu_to_millicores(value: Optional[str]) -> float:
+def _parse_cpu_to_millicores(value: str | None) -> float:
     """Convert a Kubernetes CPU quantity string to millicores.
 
     Supports: '500m', '0.5', '2', '2000m', '2.5'.
@@ -63,7 +63,7 @@ def _parse_cpu_to_millicores(value: Optional[str]) -> float:
         return 0.0
 
 
-def _parse_memory_to_bytes(value: Optional[str]) -> int:
+def _parse_memory_to_bytes(value: str | None) -> int:
     """Convert a Kubernetes memory quantity string to bytes.
 
     Supports: '256Mi', '1Gi', '512Ki', '1024'.
@@ -132,8 +132,8 @@ class K8sClient:
         exclude_namespaces: Skip namespaces in this set.
     """
 
-    context: Optional[str] = None
-    namespace_filter: Optional[list[str]] = None
+    context: str | None = None
+    namespace_filter: list[str] | None = None
     exclude_namespaces: set[str] = field(default_factory=lambda: {
         "kube-system", "kube-public", "kube-node-lease",
     })
@@ -167,13 +167,13 @@ class K8sClient:
         logger.info("Kubeconfig loaded successfully")
 
     @property
-    def core(self) -> "k8s_client.CoreV1Api":  # type: ignore[name-defined]
+    def core(self) -> k8s_client.CoreV1Api:  # type: ignore[name-defined]
         if not self._connected:
             self.connect()
         return self._core_api  # type: ignore[return-value]
 
     @property
-    def apps(self) -> "k8s_client.AppsV1Api":  # type: ignore[name-defined]
+    def apps(self) -> k8s_client.AppsV1Api:  # type: ignore[name-defined]
         if not self._connected:
             self.connect()
         return self._apps_api  # type: ignore[return-value]

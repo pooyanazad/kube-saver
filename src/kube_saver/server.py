@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Callable
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -22,7 +22,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not found"})
 
-    def log_message(self, format: str, *args) -> None:  # noqa: A003
+    def log_message(self, log_format: str, *args) -> None:  # noqa: A003
         return
 
     def _send_json(self, status: int, payload: dict) -> None:

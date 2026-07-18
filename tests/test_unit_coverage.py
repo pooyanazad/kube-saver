@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from kube_saver.analyzers.resource_waste import PodWaste, ResourceWasteReport
 from kube_saver.config import (
     AlertConfig,
     ExportConfig,
@@ -36,8 +37,6 @@ from kube_saver.models.core import (
 from kube_saver.pricing.display import convert_cost, format_yearly
 from kube_saver.pricing.engine import PricingEngine, PricingRate
 from kube_saver.recommenders.engine import generate_recommendations
-from kube_saver.analyzers.resource_waste import PodWaste, ResourceWasteReport
-
 
 # ── Models ──────────────────────────────────────────────────────────────────
 
@@ -350,19 +349,19 @@ class TestLoadConfig:
 
     def test_local_overrides_global(self, tmp_path: Path) -> None:
         g = tmp_path / "g.yaml"
-        l = tmp_path / "l.yaml"
+        local = tmp_path / "l.yaml"
         g.write_text("cloud_provider: aws\ncurrency: eur\n")
-        l.write_text("cloud_provider: gcp\n")
-        cfg = load_config(global_path=g, local_path=l)
+        local.write_text("cloud_provider: gcp\n")
+        cfg = load_config(global_path=g, local_path=local)
         assert cfg.cloud_provider == CloudProvider.GCP
         assert cfg.currency == Currency.EUR
 
     def test_env_overrides_files(self, tmp_path: Path) -> None:
-        l = tmp_path / "l.yaml"
-        l.write_text("cloud_provider: aws\n")
+        local = tmp_path / "l.yaml"
+        local.write_text("cloud_provider: aws\n")
         os.environ["KUBE_SAVER_PROVIDER"] = "azure"
         try:
-            cfg = load_config(global_path=tmp_path / "x.yaml", local_path=l)
+            cfg = load_config(global_path=tmp_path / "x.yaml", local_path=local)
             assert cfg.cloud_provider == CloudProvider.AZURE
         finally:
             del os.environ["KUBE_SAVER_PROVIDER"]

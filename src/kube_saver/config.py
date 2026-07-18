@@ -13,11 +13,12 @@ works out of the box without any configuration.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     import yaml  # type: ignore[import-untyped]
@@ -143,7 +144,7 @@ class KubeSaverConfig:
     exclude_namespaces: set[str] = field(default_factory=lambda: {
         "kube-system", "kube-public", "kube-node-lease",
     })
-    kubeconfig_context: Optional[str] = None
+    kubeconfig_context: str | None = None
     safety: SafetyConfig = field(default_factory=SafetyConfig)
     alerts: AlertConfig = field(default_factory=AlertConfig)
     pricing: PricingOverrides = field(default_factory=PricingOverrides)
@@ -261,19 +262,15 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
     """
     env = os.environ
 
-    def _env(key: str) -> Optional[str]:
+    def _env(key: str) -> str | None:
         return env.get(f"{ENV_PREFIX}{key}")
 
     if (v := _env("PROVIDER")) is not None:
-        try:
+        with contextlib.suppress(ValueError):
             cfg.cloud_provider = CloudProvider(v.lower())
-        except ValueError:
-            pass
     if (v := _env("CURRENCY")) is not None:
-        try:
+        with contextlib.suppress(ValueError):
             cfg.currency = Currency(v.lower())
-        except ValueError:
-            pass
     if (v := _env("EXCHANGE_RATE_FROM_USD")) is not None:
         cfg.exchange_rate_from_usd = float(v)
     if (v := _env("TIER")) is not None:
@@ -293,8 +290,8 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
 
 
 def load_config(
-    global_path: Optional[Path] = None,
-    local_path: Optional[Path] = None,
+    global_path: Path | None = None,
+    local_path: Path | None = None,
 ) -> KubeSaverConfig:
     """Load and merge configuration from all sources.
 

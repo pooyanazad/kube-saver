@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from kube_saver.models.core import (
     ActualUsage,
@@ -38,7 +37,7 @@ try:
 except ImportError:
     k8s_client = None  # type: ignore[assignment]
 
-    class ApiException(Exception):  # type: ignore[no-redef]
+    class ApiException(Exception):  # type: ignore[no-redef]  # noqa: N818
         pass
 
 
@@ -51,7 +50,7 @@ class MetricsCollector:
     """
 
     def __init__(self) -> None:
-        self.available: Optional[bool] = None
+        self.available: bool | None = None
         self.source: MetricSource = MetricSource.ESTIMATED
 
     def get_cpu_millicores(self, actual: ActualUsage, request: float) -> float:
@@ -73,7 +72,7 @@ class MetricsCollector:
     def collect_pod_metrics(
         self,
         pods: list[PodResourceInfo],
-        namespace: Optional[str] = None,
+        namespace: str | None = None,
     ) -> dict[str, ActualUsage]:
         """Fetch metrics for all pods and return a name -> ActualUsage map.
 
