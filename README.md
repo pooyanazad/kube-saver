@@ -41,25 +41,27 @@ kube-saver is a **terminal-based tool** that shows you real-time, exactly how mu
 - **Runtime source awareness** — uses eBPF when available, otherwise falls back to metrics-server or estimated data
 - **Smart recommendations** — suggests optimal resource requests/limits
 - **Safety guardrails** — avoids unsafe recommendations by design
-- **Export and integration foundation** — YAML, Helm, PR planning, reports, JSON, Prometheus, and server mode
+- **Self-contained outputs** — no webhook URLs, no GitHub API calls, no CDN-hosted assets required
 
 ## Status
 
-**Work in progress** — see [STEPS.md](STEPS.md) (local only) for the roadmap.
+**Phase 6 completed locally**.
 
-Current phase completed locally: **Phase 6 in progress**
-
-Implemented today:
+Implemented:
 - Phase 1 foundation
 - Phase 2 analyzers and recommendations
 - Phase 3 TUI
 - Phase 4 runtime collector fallback chain
-- Phase 5 exporter and integration MVPs
-- Phase 6 test suite and CI setup
+- Phase 5 self-contained exporters and integrations
+- Phase 6 test suite, server mode, and CI setup
+
+Key result: kube-saver now works without depending on maintainer-owned external services.
+Notifications are written to local Markdown files, PR output is generated as local review/apply artifacts, HTML reports are fully self-contained, and release artifacts are published through GitHub Actions only.
 
 ## Current Features
 
-- Interactive TUI dashboard via `python -m kube_saver.cli`
+- Interactive TUI dashboard via `kube-saver` or `python -m kube_saver.cli`
+- Click CLI subcommands: `tui`, `report`, `pr-plan`, `notify`, `serve`, `version`
 - Cluster, namespace, and pod waste analysis
 - Monthly and yearly cost estimation
 - Multi-currency display
@@ -70,12 +72,12 @@ Implemented today:
   - estimated data
 - YAML exporter
 - Helm values exporter
-- PR plan generator
-- Slack/Teams notification payload builders
+- PR plan generator that writes local review/apply files
+- Markdown notification output (daily summaries and spike alerts)
 - Prometheus metrics formatter
-- HTML report generator
+- Self-contained HTML report generator with inline CSS charts
 - JSON output builder
-- Basic HTTP API server mode
+- Basic read-only HTTP API server mode
 
 ## Installation
 
@@ -109,7 +111,18 @@ pip install -e .[ebpf]
 
 ```bash
 source .venv/bin/activate
-python3 -m kube_saver.cli
+kube-saver
+```
+
+### CLI commands
+
+```bash
+kube-saver tui
+kube-saver report -o kube-saver-report.html
+kube-saver pr-plan -d ./kube-saver-pr
+kube-saver notify -d ./kube-saver-notify --threshold 250
+kube-saver serve -p 8080 -b 127.0.0.1
+kube-saver version
 ```
 
 ### Generate default config YAML
@@ -209,8 +222,18 @@ Main modules:
 - `pricing/` — rates and currency display
 - `recommenders/` — rightsizing suggestions
 - `tui/` — Textual app and data loading
-- `exporters/` — YAML, Helm, JSON, Prometheus, HTML, notifications, PR plan
-- `server.py` — basic HTTP API mode
+- `exporters/` — YAML, Helm, JSON, Prometheus, HTML, Markdown notifications, local PR plans
+- `server.py` — basic read-only HTTP API mode
+
+## Self-contained outputs
+
+kube-saver is designed to remain useful even with no maintainer-operated service behind it.
+
+- **Notifications**: written as Markdown files to a local directory
+- **PR plans**: generated as local review files plus an `apply-patches.sh` helper
+- **Reports**: HTML is fully self-contained with inline CSS charts, no CDN assets
+- **Server**: local read-only HTTP endpoints for automation and inspection
+- **Releases**: GitHub Actions publishes build artifacts to GitHub releases; no PyPI token is required
 
 ## Troubleshooting
 
