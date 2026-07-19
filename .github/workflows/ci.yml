@@ -143,6 +143,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Sync Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver
+          short-description: kube-saver is a self-contained Kubernetes cost visibility and waste reduction CLI, TUI, and reporting tool.
+          readme-filepath: ./README.md
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
