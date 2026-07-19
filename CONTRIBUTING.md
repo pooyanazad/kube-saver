@@ -61,6 +61,13 @@ docker run --rm kube-saver:local version
 
 ## Pull requests
 
+Only the following contribution types are expected to be approved:
+
+- changes that address an existing open issue
+- critical bug fixes that protect correctness, reliability, or release quality
+
+Pull requests outside those categories may be closed without merge.
+
 Please keep pull requests:
 
 - focused on one logical change

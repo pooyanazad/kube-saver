@@ -105,19 +105,56 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
       - name: Download built artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
 
+      - name: Generate release notes
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          prev_tag=$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$RELEASE_TAG" | head -n 1 || true)
+          {
+            echo "## kube-saver ${RELEASE_TAG}"
+            echo
+            echo "Production release for kube-saver with self-contained CLI, TUI, reporting, API, and Docker delivery."
+            echo
+            echo "### Included in this release"
+            echo "- Interactive TUI for Kubernetes cost and waste visibility"
+            echo "- Self-contained HTML report generation"
+            echo "- Local notification and PR-plan output"
+            echo "- Read-only HTTP API endpoints"
+            echo "- Docker image publication to Docker Hub"
+            echo
+            echo "### Build artifacts"
+            echo "- Python wheel and source distribution attached to this release"
+            echo "- SHA256 checksums included"
+            echo
+            echo "### Changes in this release"
+            if [[ -n "$prev_tag" ]]; then
+              git log --no-merges --pretty='- %s (%h)' "$prev_tag..HEAD"
+              echo
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${RELEASE_TAG}"
+            else
+              git log --no-merges --pretty='- %s (%h)'
+            fi
+          } > release_notes.md
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          body_path: release_notes.md
           files: |
             dist/*
-          generate_release_notes: true
 
   docker:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -144,12 +181,13 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Sync Docker Hub description
+        continue-on-error: true
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver
-          short-description: kube-saver is a self-contained Kubernetes cost visibility and waste reduction CLI, TUI, and reporting tool.
+          short-description: Self-contained Kubernetes cost and waste visibility tool.
           readme-filepath: ./README.md
 
       - name: Build and push image
