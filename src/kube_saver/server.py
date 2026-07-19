@@ -22,6 +22,15 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not found"})
 
+    def do_POST(self) -> None:  # noqa: N802
+        self._send_json(405, {"error": "method not allowed"})
+
+    def do_PUT(self) -> None:  # noqa: N802
+        self._send_json(405, {"error": "method not allowed"})
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._send_json(405, {"error": "method not allowed"})
+
     def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
 
