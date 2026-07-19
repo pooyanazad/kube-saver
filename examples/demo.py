@@ -273,7 +273,7 @@ def display_report(
     console.print()
     header = Text()
     header.append("  kube-saver ", style="bold cyan")
-    header.append(" v0.1.0  ", style="dim")
+    header.append(" v1.0.0  ", style="dim")
     header.append("│ ", style="dim")
     header.append(f"Cluster: {cluster.name} ", style="bold white")
     header.append("│ ", style="dim")

@@ -216,4 +216,4 @@ class TestCliIntegration:
         runner = CliRunner()
         result = runner.invoke(click_cli, ["version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        assert "1.0.0" in result.output

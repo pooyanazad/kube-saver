@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kube-saver"
-version = "0.1.0"
+version = "1.0.0"
 description = "k9s-style TUI that shows you exactly where your Kubernetes money goes"
 readme = "README.md"
 license = "MIT"
@@ -22,7 +22,7 @@ keywords = [
     "terminal",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Framework :: AsyncIO",
     "Intended Audience :: Developers",

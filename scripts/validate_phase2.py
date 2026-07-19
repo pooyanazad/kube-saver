@@ -132,7 +132,7 @@ def main() -> None:
     else:
         console.print("[green]No recommendations — cluster looks healthy![/green]")
 
-    console.print(f"\n[dim]Analysis complete. kube-saver v0.2.0-dev | currency: {currency.code} (rate {rate})[/dim]\n")
+    console.print(f"\n[dim]Analysis complete. kube-saver v1.0.0 | currency: {currency.code} (rate {rate})[/dim]\n")
 
 
 

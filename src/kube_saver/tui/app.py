@@ -146,7 +146,7 @@ class Dashboard(Screen):
         else:
             metrics = "[yellow]estimated[/yellow]"
         warn = " [yellow]fallback[/yellow]" if getattr(d, "warnings", []) else ""
-        return f"  kube-saver v0.2.0-dev │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
+        return f"  kube-saver v1.0.0 │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)
