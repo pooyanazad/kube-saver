@@ -57,7 +57,7 @@ def build_server(
 def _openapi_stub() -> dict[str, object]:
     return {
         "openapi": "3.0.0",
-        "info": {"title": "kube-saver API", "version": "0.1.0"},
+        "info": {"title": "kube-saver API", "version": "1.0.0"},
         "paths": {
             "/healthz": {"get": {"summary": "Health check"}},
             "/api/v1/report": {"get": {"summary": "Current kube-saver report"}},

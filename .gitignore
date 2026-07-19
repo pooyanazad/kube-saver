@@ -53,3 +53,4 @@ htmlcov/
 .kube-saver/
 .kube-saver.db
 .kube-saver.cache
+README.fa.md
