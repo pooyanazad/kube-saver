@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kube-saver"
-version = "1.0.0"
+dynamic = ["version"]
 description = "k9s-style TUI that shows you exactly where your Kubernetes money goes"
 readme = "README.md"
 license = "MIT"
@@ -72,6 +72,9 @@ Issues = "https://github.com/pooyanazad/kube-saver/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kube_saver"]
+
+[tool.hatch.version]
+path = "src/kube_saver/version.py"
 
 [tool.ruff]
 target-version = "py310"

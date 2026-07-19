@@ -1,4 +1,6 @@
 """kube-saver — Kubernetes cost optimization TUI."""
 
-__version__ = "1.0.0"
+from kube_saver.version import VERSION
+
+__version__ = VERSION
 __author__ = "pooyanazad"
