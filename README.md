@@ -81,6 +81,8 @@ Notifications are written to local Markdown files, PR output is generated as loc
 
 ## Installation
 
+For contribution and development workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ### Local development install
 
 ```bash

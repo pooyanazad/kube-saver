@@ -17,6 +17,7 @@ from kube_saver.models.core import (
     ResourceQuantities,
 )
 from kube_saver.tui import data as tui_data
+from kube_saver.version import VERSION
 
 
 @dataclass
@@ -216,4 +217,4 @@ class TestCliIntegration:
         runner = CliRunner()
         result = runner.invoke(click_cli, ["version"])
         assert result.exit_code == 0
-        assert "1.0.0" in result.output
+        assert VERSION in result.output

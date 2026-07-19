@@ -6,6 +6,8 @@ import json
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from kube_saver.version import VERSION
+
 
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
@@ -57,7 +59,7 @@ def build_server(
 def _openapi_stub() -> dict[str, object]:
     return {
         "openapi": "3.0.0",
-        "info": {"title": "kube-saver API", "version": "1.0.0"},
+        "info": {"title": "kube-saver API", "version": VERSION},
         "paths": {
             "/healthz": {"get": {"summary": "Health check"}},
             "/api/v1/report": {"get": {"summary": "Current kube-saver report"}},

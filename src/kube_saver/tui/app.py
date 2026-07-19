@@ -28,6 +28,7 @@ from textual.widgets import (
 
 from kube_saver.config import KubeSaverConfig, load_config
 from kube_saver.tui.data import TUIData, load_data
+from kube_saver.version import VERSION
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ class Dashboard(Screen):
         else:
             metrics = "[yellow]estimated[/yellow]"
         warn = " [yellow]fallback[/yellow]" if getattr(d, "warnings", []) else ""
-        return f"  kube-saver v1.0.0 │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
+        return f"  kube-saver v{VERSION} │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)
