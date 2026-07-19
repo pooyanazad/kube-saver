@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import kube_saver.cli as cli
 from kube_saver.config import load_config
 from kube_saver.models.core import (
     ActualUsage,
@@ -185,14 +184,7 @@ class TestCliIntegration:
     def test_cli_main_launches_app(self, monkeypatch) -> None:
         fake_app = {"instance": None}
 
-        def _fake_load_config():
-            return load_config()
-
         def _fake_import(name, *args, **kwargs):
-            if name == "kube_saver.config":
-                class _CfgModule:
-                    load_config = staticmethod(_fake_load_config)
-                return _CfgModule()
             if name == "kube_saver.tui.app":
                 class _AppModule:
                     class KubeSaverApp(_FakeApp):
@@ -203,11 +195,25 @@ class TestCliIntegration:
             return original_import(name, *args, **kwargs)
 
         import builtins
-
         original_import = builtins.__import__
         monkeypatch.setattr(builtins, "__import__", _fake_import)
 
-        exit_code = cli.main()
-        assert exit_code == 0
+        from click.testing import CliRunner
+
+        from kube_saver.cli import cli as click_cli
+
+        runner = CliRunner()
+        result = runner.invoke(click_cli, ["tui"])
+        assert result.exit_code == 0
         assert fake_app["instance"] is not None
         assert fake_app["instance"].ran is True
+
+    def test_cli_version(self) -> None:
+        from click.testing import CliRunner
+
+        from kube_saver.cli import cli as click_cli
+
+        runner = CliRunner()
+        result = runner.invoke(click_cli, ["version"])
+        assert result.exit_code == 0
+        assert "0.1.0" in result.output

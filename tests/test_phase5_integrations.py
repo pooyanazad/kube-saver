@@ -1,11 +1,16 @@
+"""Phase 5 integration tests — PR plan, notifications, exporters, server."""
+
+from pathlib import Path
+
 from kube_saver.analyzers.cost_waste import CostWasteReport, NamespaceCostAnalysis
 from kube_saver.analyzers.resource_waste import NamespaceAnalysis, ResourceWasteReport
 from kube_saver.exporters.notifier import (
     NotificationRateLimiter,
     build_daily_summary,
     build_spike_alert,
+    write_notification,
 )
-from kube_saver.exporters.pr_generator import generate_pr_plan
+from kube_saver.exporters.pr_generator import apply_plan_locally, generate_pr_plan
 from kube_saver.models.core import CostInfo, NamespaceInfo, Recommendation
 
 
@@ -50,28 +55,62 @@ def _cost_report(monthly: float = 123.45) -> CostWasteReport:
 
 
 def test_generate_pr_plan_dry_run() -> None:
-    plan = generate_pr_plan(_recommendations(), provider="github", dry_run=True)
-    assert plan.provider == "github"
+    plan = generate_pr_plan(_recommendations())
     assert plan.dry_run is True
-    assert "500m -> 150m" in plan.body
+    assert "500m" in plan.body
+    assert "150m" in plan.body
     assert plan.branch_name.startswith("kube-saver/")
+    assert "summary.md" in plan.files
+    assert "apply-patches.sh" in plan.files
+
+
+def test_apply_plan_locally(tmp_path: Path) -> None:
+    plan = generate_pr_plan(_recommendations())
+    out = apply_plan_locally(plan, output_dir=tmp_path)
+    assert (out / "summary.md").exists()
+    assert (out / "apply-patches.sh").exists()
+    assert (out / "README.md").exists()
+    content = (out / "summary.md").read_text()
+    assert "150m" in content
 
 
 
-def test_build_daily_summary_for_slack() -> None:
-    msg = build_daily_summary(_resource_report(), _cost_report(), channel="slack")
-    assert msg.channel == "slack"
+def test_build_daily_summary() -> None:
+    msg = build_daily_summary(_resource_report(), _cost_report())
     assert "daily waste summary" in msg.title
     assert "$123.45" in msg.text
-    assert "text" in msg.payload
-
+    assert msg.filename == "daily-summary.md"
 
 
 def test_build_spike_alert_and_rate_limit() -> None:
-    msg = build_spike_alert(_cost_report(monthly=900.0), threshold_monthly_usd=500.0, channel="teams")
+    msg = build_spike_alert(_cost_report(monthly=900.0), threshold_monthly_usd=500.0)
     assert msg is not None
-    assert msg.channel == "teams"
+    assert "spike" in msg.title
+
+    # Under threshold → None
+    assert build_spike_alert(_cost_report(monthly=100.0), threshold_monthly_usd=500.0) is None
 
     limiter = NotificationRateLimiter(min_interval_seconds=3600)
     assert limiter.allow("critical/default") is True
     assert limiter.allow("critical/default") is False
+
+
+def test_write_notification(tmp_path: Path) -> None:
+    """write_notification should create a Markdown file with timestamp."""
+    msg = build_daily_summary(_resource_report(), _cost_report())
+    path = write_notification(msg, output_dir=tmp_path)
+    assert path.exists()
+    assert path.suffix == ".md"
+    assert path.stem.startswith("daily-summary-")
+    content = path.read_text()
+    assert "kube-saver daily waste summary" in content
+    assert "$123.45" in content
+
+
+def test_write_notification_does_not_overwrite(tmp_path: Path) -> None:
+    """Calling write_notification twice should produce two distinct files."""
+    msg = build_daily_summary(_resource_report(), _cost_report())
+    p1 = write_notification(msg, output_dir=tmp_path)
+    p2 = write_notification(msg, output_dir=tmp_path)
+    assert p1 != p2
+    assert p1.exists() and p2.exists()
