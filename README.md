@@ -26,7 +26,15 @@ kube-saver is a terminal tool that turns invisible cluster waste into visible do
 
 ## What is kube-saver?
 
-kube-saver is a **terminal-based tool** that shows you real-time, exactly how much money and resources are being wasted in your Kubernetes cluster. Think of it as **k9s but focused on cost and efficiency**.
+**kube-saver is a fast, offline, self-contained Kubernetes cost visibility tool that turns cluster waste into dollar amounts you can act on in one command.**
+
+It gives platform engineers, SREs, and DevOps teams the three things most cost tools miss:
+
+- A real dollar number per namespace, workload, and pod — not just CPU millicores
+- A tool that runs from a kubeconfig alone, with no account, no token, and no hosted backend
+- Self-contained outputs (HTML report, PR plan, notification files) that work anywhere, even offline
+
+If you can run `kubectl`, you can run kube-saver. The README, TUI, reports, and CI outputs are designed to be useful within five minutes of install — even if you have never used the tool before.
 
 ### Who is this for?
 
@@ -73,6 +81,8 @@ kube-saver was built around those three problems from the start.
 - **Runtime source awareness** — uses eBPF when available, otherwise falls back to metrics-server or estimated data
 - **Smart recommendations** — suggests optimal resource requests and limits
 - **Safety guardrails** — avoids unsafe recommendations by design
+
+**Try it now on any cluster you have kubeconfig access to. You will have a real cost report in five minutes, and you do not need to install anything else, create any account, or open any port.**
 
 ## Quick proof of concept
 
@@ -348,7 +358,9 @@ GitHub Actions now runs:
 
 ## Why?
 
-Because **Kubernetes waste is real money**, and teams need a fast terminal tool to see it clearly.
+kube-saver exists because Kubernetes waste is real money, and most teams only see it as vague CPU/memory charts. A clear dollar number, in a tool you can run locally in under a minute, with outputs you can actually share, is the fastest path from "we probably over-provision" to "we cut $X this quarter."
+
+If that sounds useful, run the [Quick Start](#quick-start) — you'll have a real report in five minutes.
 
 ## License
 
