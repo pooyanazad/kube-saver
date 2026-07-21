@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg)](https://kubernetes.io/)
-[![Status: WIP](https://img.shields.io/badge/status-work%20in%20progress-orange.svg)](https://github.com/pooyanazad/kube-saver)
+[![Status: Production](https://img.shields.io/badge/status-production-brightgreen.svg)](https://github.com/pooyanazad/kube-saver)
 
 ```
 ┌─ kube-saver ─────────────────────────────────────────────────────┐
@@ -26,7 +26,25 @@
 
 kube-saver is a **terminal-based tool** that shows you real-time, exactly how much money and resources are being wasted in your Kubernetes cluster. Think of it as **k9s but focused on cost and efficiency**.
 
-### The Problem
+### Who is this for?
+
+kube-saver is built for:
+
+- **Platform engineers** who manage Kubernetes clusters and want clear visibility into where compute budget is being wasted
+- **DevOps teams** who need to communicate infrastructure cost to engineering stakeholders without relying on cloud dashboards alone
+- **SREs and operators** who want a self-contained, scriptable tool that works in CI and local environments without external services
+- **Startup teams** running Kubernetes on a budget who want to cut waste before it becomes a problem
+- **Solo cluster operators** who want one fast tool to understand and report on cluster cost without complexity
+
+### Who this is NOT for?
+
+kube-saver is not a substitute for:
+
+- Full cloud cost management platforms (it does not ingest billing data)
+- Automated rightsizing engines that apply changes directly
+- Tools that require a hosted service or account to function
+
+## The Problem
 
 - **40-60% of allocated CPU is never used**
 - **50% of memory requests are over-provisioned**
