@@ -1,6 +1,8 @@
 # kube-saver
 
-> **k9s-style TUI that shows you exactly where your Kubernetes money goes.**
+> **See exactly where your Kubernetes money goes — then fix it.**
+
+kube-saver is a terminal tool that turns invisible cluster waste into visible dollar amounts, works entirely offline with just your kubeconfig, and generates self-contained reports you can share with anyone.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -44,26 +46,48 @@ kube-saver is not a substitute for:
 - Automated rightsizing engines that apply changes directly
 - Tools that require a hosted service or account to function
 
-## The Problem
+## Three problems kube-saver solves
 
-- **40-60% of allocated CPU is never used**
-- **50% of memory requests are over-provisioned**
-- Engineers default to "2 CPU, 4GB RAM" and never change it
-- Nobody correlates wasted CPU to wasted dollars in real time
-- Existing tools (VPA, Goldilocks) are either too complex or too simple
+These are the hard problems kube-saver addresses better than existing alternatives.
 
-### Why kube-saver is Different
+### 1. You cannot fix what you cannot see in dollars
 
-- **k9s-style interactive TUI** — navigate clusters, namespaces, pods with keyboard
-- **Real cost visibility** — shows actual $ waste, not just resource waste
+Most Kubernetes tools report waste in CPU millicores and memory bytes. That does not help you prioritize. kube-saver converts every waste signal into **actual monthly cost**, so you know which namespace to fix first.
+
+### 2. Cost visibility should not require an account, a cloud backend, or a SaaS signup
+
+Existing cloud dashboards and cost tools often depend on external accounts, API tokens, or hosted backends. kube-saver works **entirely offline** with just your kubeconfig. No accounts, no tokens, no external service, no data leaves your machine.
+
+### 3. Reports should be self-contained and shareable without dependencies
+
+When you generate an HTML report, notification, or PR plan, it should work for anyone — in a browser, in CI, or in an email — with no CDN, no hosted assets, and no webhook endpoints. kube-saver outputs are **fully self-contained by design**.
+
+## Why kube-saver is Different
+
+kube-saver was built around those three problems from the start.
+
+- **Shows dollar waste, not just resource waste** — monthly and yearly cost estimates are built into every view
+- **Works with just a kubeconfig** — no cloud account, no hosted service, no external dependency
+- **Self-contained outputs** — HTML reports, PR plans, notifications, and JSON are fully portable
+- **k9s-style interactive TUI** — navigate clusters, namespaces, and pods with the keyboard
 - **Runtime source awareness** — uses eBPF when available, otherwise falls back to metrics-server or estimated data
-- **Smart recommendations** — suggests optimal resource requests/limits
+- **Smart recommendations** — suggests optimal resource requests and limits
 - **Safety guardrails** — avoids unsafe recommendations by design
-- **Self-contained outputs** — no webhook URLs, no GitHub API calls, no CDN-hosted assets required
+
+## Quick proof of concept
+
+If you have access to any Kubernetes cluster, you can see kube-saver in action right now:
+
+```bash
+kube-saver report -o kube-saver-report.html
+open kube-saver-report.html    # or: xdg-open on Linux
+```
+
+This generates a self-contained HTML report you can open in any browser — no server, no API key, no internet required.
 
 ## Status
 
-**Phase 6 completed locally**.
+**Production-quality release.**
 
 Implemented:
 - Phase 1 foundation
