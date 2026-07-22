@@ -1,0 +1,51 @@
+## Summary
+
+- Recommendations: 40
+
+## Before / After
+
+- **prod/ReplicaSet/auth-svc-84c6cb7889** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/auth-svc-84c6cb7889** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `cpu-request`: 1000m → 50m
+- **prod/ReplicaSet/cart-svc-857b89f789** `cpu-request`: 750m → 50m
+- **prod/ReplicaSet/cart-svc-857b89f789** `cpu-request`: 750m → 50m
+- **prod/ReplicaSet/cart-svc-857b89f789** `cpu-request`: 750m → 50m
+- **prod/ReplicaSet/api-gateway-d57c5f75** `cpu-request`: 500m → 50m
+- **prod/ReplicaSet/api-gateway-d57c5f75** `cpu-request`: 500m → 50m
+- **prod/ReplicaSet/api-gateway-d57c5f75** `cpu-request`: 500m → 50m
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `cpu-request`: 500m → 50m
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `cpu-request`: 500m → 50m
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `cpu-request`: 500m → 50m
+- **staging/ReplicaSet/staging-api-88d5896** `cpu-request`: 300m → 50m
+- **staging/ReplicaSet/staging-api-88d5896** `cpu-request`: 300m → 50m
+- **prod/ReplicaSet/auth-svc-84c6cb7889** `memory-request`: 2.0Gi → 64Mi
+- **prod/ReplicaSet/auth-svc-84c6cb7889** `memory-request`: 2.0Gi → 64Mi
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `memory-request`: 1.0Gi → 64Mi
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `memory-request`: 1.0Gi → 64Mi
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `memory-request`: 1.0Gi → 64Mi
+- **prod/ReplicaSet/checkout-svc-669ffb9b96** `memory-request`: 1.0Gi → 64Mi
+- **prod/ReplicaSet/cart-svc-857b89f789** `memory-request`: 768Mi → 64Mi
+- **prod/ReplicaSet/cart-svc-857b89f789** `memory-request`: 768Mi → 64Mi
+- **prod/ReplicaSet/cart-svc-857b89f789** `memory-request`: 768Mi → 64Mi
+- **prod/ReplicaSet/api-gateway-d57c5f75** `memory-request`: 512Mi → 64Mi
+- **prod/ReplicaSet/api-gateway-d57c5f75** `memory-request`: 512Mi → 64Mi
+- **prod/ReplicaSet/api-gateway-d57c5f75** `memory-request`: 512Mi → 64Mi
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `memory-request`: 512Mi → 64Mi
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `memory-request`: 512Mi → 64Mi
+- **staging/ReplicaSet/staging-worker-54b45b8dcf** `memory-request`: 512Mi → 64Mi
+- **data/ReplicaSet/cache-f6c5c7759** `cpu-request`: 100m → 50m
+- **dev/ReplicaSet/dev-api-7c679b65c9** `cpu-request`: 100m → 50m
+- **monitoring/ReplicaSet/dashboard-7d865bd986** `cpu-request`: 100m → 50m
+- **staging/ReplicaSet/staging-api-88d5896** `memory-request`: 256Mi → 64Mi
+- **staging/ReplicaSet/staging-api-88d5896** `memory-request`: 256Mi → 64Mi
+- **data/ReplicaSet/cache-f6c5c7759** `memory-request`: 256Mi → 64Mi
+- **dev/ReplicaSet/dev-api-7c679b65c9** `memory-request`: 128Mi → 64Mi
+- **monitoring/ReplicaSet/dashboard-7d865bd986** `memory-request`: 128Mi → 64Mi
+
+## Safety
+
+- All suggestions are derived from actual resource waste analysis.
+- Review carefully before applying to production.

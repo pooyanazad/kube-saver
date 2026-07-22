@@ -1,289 +1,156 @@
 # kube-saver
 
-> **k9s-style TUI that shows you exactly where your Kubernetes money goes.**
+> **See exactly where your Kubernetes money goes — then fix it.**
+
+A fast, offline, self-contained Kubernetes cost analyzer.
+Works from your kubeconfig alone — no cloud account, no SaaS signup, no hosted service.
+Turns invisible cluster waste into visible dollar amounts you can act on in one command.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg)](https://kubernetes.io/)
-[![Status: WIP](https://img.shields.io/badge/status-work%20in%20progress-orange.svg)](https://github.com/pooyanazad/kube-saver)
+[![Status: Production](https://img.shields.io/badge/status-production-brightgreen.svg)](https://github.com/pooyanazad/kube-saver)
+
+---
+
+## What you get
 
 ```
 ┌─ kube-saver ─────────────────────────────────────────────────────┐
-│ Cluster: prod-us-east-1  │ Provider: AWS  │ CPU: 124/400 cores   │
+│ Total Monthly Waste: $406.79 │ Efficiency: 0% │ Pods: 21         │
 ├──────────────────────────────────────────────────────────────────┤
-│ Total Monthly Waste: $2,847  │  Efficiency: 42%  │  Pods: 312    │
-├──────────────────────────────────────────────────────────────────┤
-│ Namespace          CPU Waste    Mem Waste    Monthly $   Score   │
-│ default            45.2 cores   98 GB        $1,247     ██░░ 34  │
-│ payments           12.8 cores   34 GB        $    642   ███░ 51  │
-│ analytics           8.1 cores   22 GB        $    418   ███░ 58  │
-│ staging             3.2 cores    9 GB        $    312   ████ 72  │
-│ monitoring          0.8 cores    2 GB        $     89   █████ 91 │
+│ Namespace    CPU Waste   Mem Waste   Monthly $                   │
+│ prod         9750m       12032Mi     $327.59                     │
+│ staging      2100m        2048Mi      $68.62                     │
+│ data           90m         256Mi       $3.83                     │
+│ dev           100m         128Mi       $3.38                     │
+│ monitoring     50m         128Mi       $3.38                     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## What is kube-saver?
+- **Real dollar amounts** for every namespace, workload, and pod — not just millicores
+- **Interactive TUI** — k9s-style keyboard navigation, cost and recommendation views
+- **Self-contained HTML report** — open in any browser, email as-is, no CDN
+- **Local PR plans** — review and apply right-sizing changes without touching a cloud API
+- **Markdown spike alerts** — daily summaries written to local files, no webhook needed
+- **Three runtime sources**: eBPF → metrics-server → safe estimates
 
-kube-saver is a **terminal-based tool** that shows you real-time, exactly how much money and resources are being wasted in your Kubernetes cluster. Think of it as **k9s but focused on cost and efficiency**.
+---
 
-### The Problem
+## Screenshots
 
-- **40-60% of allocated CPU is never used**
-- **50% of memory requests are over-provisioned**
-- Engineers default to "2 CPU, 4GB RAM" and never change it
-- Nobody correlates wasted CPU to wasted dollars in real time
-- Existing tools (VPA, Goldilocks) are either too complex or too simple
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="kube-saver TUI dashboard" width="780" />
+</p>
+<p align="center"><em>Namespace overview — wastes, pods, and monthly cost at a glance.</em></p>
 
-### Why kube-saver is Different
+<p align="center">
+  <img src="docs/screenshots/cost.png" alt="kube-saver cost breakdown" width="780" />
+</p>
+<p align="center"><em>Per-namespace cost breakdown with CPU and memory waste.</em></p>
 
-- **k9s-style interactive TUI** — navigate clusters, namespaces, pods with keyboard
-- **Real cost visibility** — shows actual $ waste, not just resource waste
-- **Runtime source awareness** — uses eBPF when available, otherwise falls back to metrics-server or estimated data
-- **Smart recommendations** — suggests optimal resource requests/limits
-- **Safety guardrails** — avoids unsafe recommendations by design
-- **Self-contained outputs** — no webhook URLs, no GitHub API calls, no CDN-hosted assets required
+<p align="center">
+  <img src="docs/screenshots/recommendations.png" alt="kube-saver recommendations" width="780" />
+</p>
+<p align="center"><em>Actionable right-sizing recommendations with savings per workload.</em></p>
 
-## Status
+---
 
-**Phase 6 completed locally**.
-
-Implemented:
-- Phase 1 foundation
-- Phase 2 analyzers and recommendations
-- Phase 3 TUI
-- Phase 4 runtime collector fallback chain
-- Phase 5 self-contained exporters and integrations
-- Phase 6 test suite, server mode, and CI setup
-
-Key result: kube-saver now works without depending on maintainer-owned external services.
-Notifications are written to local Markdown files, PR output is generated as local review/apply artifacts, HTML reports are fully self-contained, and release artifacts are published through GitHub Actions only.
-
-## Current Features
-
-- Interactive TUI dashboard via `kube-saver` or `python -m kube_saver.cli`
-- Click CLI subcommands: `tui`, `report`, `pr-plan`, `notify`, `serve`, `version`
-- Cluster, namespace, and pod waste analysis
-- Monthly and yearly cost estimation
-- Multi-currency display
-- Custom CPU and memory pricing
-- Runtime metric fallback chain:
-  - eBPF
-  - metrics-server
-  - estimated data
-- YAML exporter
-- Helm values exporter
-- PR plan generator that writes local review/apply files
-- Markdown notification output (daily summaries and spike alerts)
-- Prometheus metrics formatter
-- Self-contained HTML report generator with inline CSS charts
-- JSON output builder
-- Basic read-only HTTP API server mode
-
-## Installation
-
-For contribution and development workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Local development install
+## Quick start
 
 ```bash
-git clone https://github.com/pooyanazad/kube-saver.git
-cd kube-saver
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
+pip install kube-saver
 ```
 
-### Minimal install
-
 ```bash
-pip install -e .
-```
-
-### Optional eBPF support
-
-```bash
-pip install -e .[ebpf]
-```
-
-> Note: eBPF support also depends on host kernel capabilities and BCC availability.
-
-## Quick Start
-
-### Launch the TUI
-
-```bash
-source .venv/bin/activate
+# Interactive TUI — opens immediately
 kube-saver
+
+# Self-contained HTML report
+kube-saver report -o cost-report.html && open cost-report.html
+
+# Local PR plan with review and apply files
+kube-saver pr-plan -d ./pr-files
 ```
 
-### CLI commands
+Time to first result: **under 5 minutes** if you have `kubectl` access to any cluster.
+See the [full getting started guide](docs/getting-started.md) for kind, EKS, Docker Desktop, and generic kubeconfig.
 
-```bash
-kube-saver tui
-kube-saver report -o kube-saver-report.html
-kube-saver pr-plan -d ./kube-saver-pr
-kube-saver notify -d ./kube-saver-notify --threshold 250
-kube-saver serve -p 8080 -b 127.0.0.1
-kube-saver version
+---
+
+## Before / after example
+
+```
+prod/auth-svc        cpu-request  1000m  → 50m      save ~$25/mo per replica
+prod/auth-svc        mem-request  2.0Gi  → 64Mi     save ~$15/mo per replica
+staging/staging-api  cpu-request   300m  → 50m      save ~$7/mo per replica
 ```
 
-### Generate default config YAML
+Real output from the demo cluster: **40 high-confidence recommendations, $373.03/mo potential savings** — see the [recommendations screenshot](docs/screenshots/recommendations.png).
 
-```bash
-python3 -c "from kube_saver.config import default_config_yaml; print(default_config_yaml())"
-```
+---
 
-### Use JSON output helpers in automation
+## Why kube-saver instead of …
 
-```bash
-python3 - <<'PY2'
-from kube_saver.exporters.json_output import build_json_report
-print(build_json_report(cluster=None, resource_report=None, cost_report=None, recommendations=[]))
-PY2
-```
+| Feature | **kube-saver** | k9s | Goldilocks | VPA | Kubecost |
+|---|---|---|---|---|---|
+| Cost in dollars | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Fully offline | ✅ | ✅ | ✅ | ✅ | ❌ needs Prometheus |
+| Self-contained HTML report | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Interactive TUI | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Right-sizing recommendations | ✅ | ❌ | ✅ | ✅ live | partial |
+| Local PR plan generator | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Works without hosted service | ✅ | ✅ | ✅ | ✅ | ❌ |
 
-### Run the basic API server
+kube-saver's niche: **dollar-first, offline, shareable**.
+It does not replace live autoscaling — it gives you the number and the plan.
 
-```python
-from kube_saver.server import build_server
+---
 
-server = build_server(lambda: {"status": "ok"}, port=8080)
-server.serve_forever()
-```
+## Who this is for
 
-## Configuration
+- **Platform engineers** who need to know where compute budget is leaking
+- **DevOps / SRE teams** who have to communicate cost without a cloud dashboard
+- **Startup teams** running Kubernetes on a tight budget
+- **Solo cluster operators** who want one fast, scriptable tool
 
-kube-saver lets you change both **currency** and **CPU/memory pricing** in a few lines — no code edits required.
+**Who this is NOT for:**
+Teams that need live automated right-sizing (use VPA), billing-data ingestion (use a full cloud cost platform), or a hosted SaaS.
 
-### Change currency
+---
 
-Edit `~/.kube-saver/config.yaml` (or any `.kube-saver.yaml` in your project):
+## How it stays independent
 
-```yaml
-currency: eur                  # usd, eur, gbp, aed, jpy, inr
-exchange_rate_from_usd: 0.92   # 1 USD -> 0.92 EUR
-```
+kube-saver has **no hosted service, no account, and no external dependency**:
 
-Or set at runtime:
+- HTML reports are fully self-contained (inline CSS, no CDN, works offline)
+- Notifications are written to local Markdown files
+- PR plans are local review/apply files — no cloud API
+- The HTTP API is loopback-only by default
+- Releases are published via GitHub Actions — no PyPI token needed
 
-```bash
-export KUBE_SAVER_CURRENCY=eur
-export KUBE_SAVER_EXCHANGE_RATE_FROM_USD=0.92
-```
+If this repo disappeared tomorrow, every release artifact still works.
 
-### Change CPU or memory price
+---
 
-```yaml
-pricing:
-  cpu_per_core_hour_usd: 0.05     # default 0.040
-  memory_per_gb_hour_usd: 0.006   # default 0.005
-```
+## Documentation
 
-Or at runtime:
+| Document | What's inside |
+|---|---|
+| [Getting started](docs/getting-started.md) | First-run guide for kind, EKS, Docker Desktop, generic kubeconfig |
+| [CLI reference](docs/cli-reference.md) | Every command, flag, JSON helper, server mode |
+| [Configuration](docs/configuration.md) | Currency, pricing, env vars, all config keys |
+| [Architecture](docs/architecture.md) | Module map, data flow, runtime source chain |
+| [Comparison](docs/comparison.md) | Detailed comparison vs k9s, Goldilocks, VPA, Kubecost |
+| [Safety & trust](docs/safety.md) | What kube-saver will never do, RBAC, recommendation boundaries |
+| [Self-contained outputs](docs/self-contained.md) | Why no hosted service, output guarantees |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
 
-```bash
-export KUBE_SAVER_CPU_PER_CORE=0.05
-export KUBE_SAVER_MEM_PER_GB=0.006
-```
-
-### Other useful config sections
-
-```yaml
-cloud_provider: aws
-provider_tier: general
-exclude_namespaces:
-  - kube-system
-  - kube-public
-alerts:
-  warning_waste_ratio: 0.4
-  critical_waste_ratio: 0.8
-  warning_monthly_usd: 100
-  critical_monthly_usd: 500
-export:
-  output_directory: ./kube-saver-exports
-  dry_run: true
-tui:
-  refresh_interval_seconds: 30
-  compact_mode: false
-```
-
-## Architecture
-
-High-level flow:
-
-1. **Collectors** gather cluster state and runtime data
-2. **Analyzers** compute waste and health
-3. **Pricing engine** converts waste to cost
-4. **Recommendation engine** proposes safer resource values
-5. **TUI and exporters** present the results
-
-Main modules:
-
-- `collectors/` — Kubernetes, metrics-server, runtime fallback, eBPF safety
-- `analyzers/` — waste, cost, health, alerts
-- `pricing/` — rates and currency display
-- `recommenders/` — rightsizing suggestions
-- `tui/` — Textual app and data loading
-- `exporters/` — YAML, Helm, JSON, Prometheus, HTML, Markdown notifications, local PR plans
-- `server.py` — basic read-only HTTP API mode
-
-## Self-contained outputs
-
-kube-saver is designed to remain useful even with no maintainer-operated service behind it.
-
-- **Notifications**: written as Markdown files to a local directory
-- **PR plans**: generated as local review files plus an `apply-patches.sh` helper
-- **Reports**: HTML is fully self-contained with inline CSS charts, no CDN assets
-- **Server**: local read-only HTTP endpoints for automation and inspection
-- **Releases**: GitHub Actions publishes build artifacts to GitHub releases; no PyPI token is required
-
-## Troubleshooting
-
-### TUI opens but metrics are estimated
-
-This usually means:
-- metrics-server is not available, or
-- eBPF is unavailable, so kube-saver fell back
-
-Phase 4 intentionally degrades safely instead of crashing.
-
-### eBPF is not being used
-
-Common reasons:
-- Python BCC bindings are not installed
-- host kernel capabilities are missing
-- tracefs/debugfs is unavailable
-- root or extra capabilities may be required
-
-### Kubernetes connection fails
-
-Check:
-- your kubeconfig context
-- cluster reachability
-- RBAC permissions
-- whether the current environment should use kubeconfig or in-cluster config
-
-### Tests
-
-Run all tests:
-
-```bash
-source .venv/bin/activate
-pytest tests -q
-```
-
-Run with coverage:
-
-```bash
-source .venv/bin/activate
-pytest tests --cov=src/kube_saver --cov-report=term-missing -q
-```
+---
 
 ## Contributing
 
-Contributions are welcome.
-
-Suggested local workflow:
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow.
 
 ```bash
 git checkout -b my-change
@@ -293,21 +160,6 @@ ruff check src tests
 mypy src
 ```
 
-Please keep changes small, tested, and focused.
-
-## CI/CD
-
-GitHub Actions now runs:
-- Ruff
-- Mypy
-- Pytest
-- package build
-- tagged release and Docker jobs
-
-## Why?
-
-Because **Kubernetes waste is real money**, and teams need a fast terminal tool to see it clearly.
-
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
