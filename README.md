@@ -157,6 +157,8 @@ For contribution and development workflow details, see [CONTRIBUTING.md](CONTRIB
 
 ## Quick Start
 
+**Time to first result: under 5 minutes.** pip install, run `kube-saver report`, open the HTML — that is the entire flow.
+
 ### One-command path
 
 Connect to any cluster with `kubectl`, then run one of these:
