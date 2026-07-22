@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>kube-saver report</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:1100px;margin:0 auto;
+padding:24px;color:#1f2937;background:#fff}
+h1,h2{color:#111827}
+h1{border-bottom:2px solid #3b82f6;padding-bottom:8px}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+gap:12px;margin:20px 0}
+.card{border:1px solid #d1d5db;border-radius:8px;padding:16px;background:#f9fafb;
+text-align:center}
+.card strong{display:block;font-size:.85rem;color:#6b7280;margin-bottom:4px}
+.card .val{font-size:1.5rem;font-weight:700;color:#111827}
+.chart-section{margin:24px 0}
+.bar-row{display:flex;align-items:center;margin-bottom:6px}
+.bar-label{min-width:140px;text-align:right;padding-right:10px;font-size:.85rem;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:24px;background:#e5e7eb;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;font-size:.75rem;color:#fff;
+padding:0 6px;min-width:40px;display:flex;align-items:center;white-space:nowrap}
+table{border-collapse:collapse;width:100%;margin-top:16px}
+th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;font-size:.9rem}
+th{background:#f3f4f6;position:sticky;top:0}
+@media print{body{padding:0}.bar-track{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<h1>kube-saver executive summary</h1>
+<div class="summary">
+  <div class="card"><strong>Total pods</strong><span class="val">21</span></div>
+  <div class="card"><strong>CPU waste</strong><span class="val">12150m</span></div>
+  <div class="card"><strong>Memory waste</strong><span class="val">14592Mi</span></div>
+  <div class="card"><strong>Monthly savings</strong><span class="val">$406.79</span></div>
+</div>
+
+<h2>Cost Waste by Namespace</h2><div class="chart-section"><div class="bar-row"><span class="bar-label">prod</span><div class="bar-track"><div class="bar-fill" style="width:100.0%">$327.59</div></div></div>
+<div class="bar-row"><span class="bar-label">staging</span><div class="bar-track"><div class="bar-fill" style="width:20.9%">$68.62</div></div></div>
+<div class="bar-row"><span class="bar-label">data</span><div class="bar-track"><div class="bar-fill" style="width:1.2%">$3.83</div></div></div>
+<div class="bar-row"><span class="bar-label">dev</span><div class="bar-track"><div class="bar-fill" style="width:1.0%">$3.38</div></div></div>
+<div class="bar-row"><span class="bar-label">monitoring</span><div class="bar-track"><div class="bar-fill" style="width:1.0%">$3.38</div></div></div>
+<div class="bar-row"><span class="bar-label">default</span><div class="bar-track"><div class="bar-fill" style="width:0.0%">$0.00</div></div></div>
+<div class="bar-row"><span class="bar-label">local-path-storage</span><div class="bar-track"><div class="bar-fill" style="width:0.0%">$0.00</div></div></div></div><h2>Efficiency by Namespace</h2><div class="chart-section"><div class="bar-row"><span class="bar-label">prod</span><div class="bar-track"><div class="bar-fill eff" style="width:0.0%;background:#ef4444">0.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">staging</span><div class="bar-track"><div class="bar-fill eff" style="width:0.0%;background:#ef4444">0.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">data</span><div class="bar-track"><div class="bar-fill eff" style="width:0.0%;background:#ef4444">0.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">dev</span><div class="bar-track"><div class="bar-fill eff" style="width:0.0%;background:#ef4444">0.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">monitoring</span><div class="bar-track"><div class="bar-fill eff" style="width:0.0%;background:#ef4444">0.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">default</span><div class="bar-track"><div class="bar-fill eff" style="width:100.0%;background:#22c55e">100.0%</div></div></div>
+<div class="bar-row"><span class="bar-label">local-path-storage</span><div class="bar-track"><div class="bar-fill eff" style="width:100.0%;background:#22c55e">100.0%</div></div></div></div>
+
+<h2>Namespace Breakdown</h2>
+<table>
+<thead><tr><th>Namespace</th><th>Monthly waste (USD)</th><th>Efficiency</th></tr></thead>
+<tbody><tr><td>prod</td><td>$327.59</td><td>0.0%</td></tr><tr><td>staging</td><td>$68.62</td><td>0.0%</td></tr><tr><td>data</td><td>$3.83</td><td>0.0%</td></tr><tr><td>dev</td><td>$3.38</td><td>0.0%</td></tr><tr><td>monitoring</td><td>$3.38</td><td>0.0%</td></tr><tr><td>default</td><td>$0.00</td><td>100.0%</td></tr><tr><td>local-path-storage</td><td>$0.00</td><td>100.0%</td></tr></tbody>
+</table>
+
+<h2>Recommendations (40)</h2>
+<table>
+<thead><tr><th>Namespace</th><th>Kind</th><th>Name</th><th>Resource</th><th>Current</th><th>Suggested</th></tr></thead>
+<tbody><tr><td>prod</td><td>ReplicaSet</td><td>auth-svc-84c6cb7889</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>auth-svc-84c6cb7889</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>cpu-request</td><td>1000m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>cpu-request</td><td>750m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>cpu-request</td><td>750m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>cpu-request</td><td>750m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>cpu-request</td><td>500m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-api-88d5896</td><td>cpu-request</td><td>300m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-api-88d5896</td><td>cpu-request</td><td>300m</td><td>50m</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>auth-svc-84c6cb7889</td><td>memory-request</td><td>2.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>auth-svc-84c6cb7889</td><td>memory-request</td><td>2.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>memory-request</td><td>1.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>memory-request</td><td>1.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>memory-request</td><td>1.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>checkout-svc-669ffb9b96</td><td>memory-request</td><td>1.0Gi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>memory-request</td><td>768Mi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>memory-request</td><td>768Mi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>cart-svc-857b89f789</td><td>memory-request</td><td>768Mi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>prod</td><td>ReplicaSet</td><td>api-gateway-d57c5f75</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-worker-54b45b8dcf</td><td>memory-request</td><td>512Mi</td><td>64Mi</td></tr><tr><td>data</td><td>ReplicaSet</td><td>cache-f6c5c7759</td><td>cpu-request</td><td>100m</td><td>50m</td></tr><tr><td>dev</td><td>ReplicaSet</td><td>dev-api-7c679b65c9</td><td>cpu-request</td><td>100m</td><td>50m</td></tr><tr><td>monitoring</td><td>ReplicaSet</td><td>dashboard-7d865bd986</td><td>cpu-request</td><td>100m</td><td>50m</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-api-88d5896</td><td>memory-request</td><td>256Mi</td><td>64Mi</td></tr><tr><td>staging</td><td>ReplicaSet</td><td>staging-api-88d5896</td><td>memory-request</td><td>256Mi</td><td>64Mi</td></tr><tr><td>data</td><td>ReplicaSet</td><td>cache-f6c5c7759</td><td>memory-request</td><td>256Mi</td><td>64Mi</td></tr><tr><td>dev</td><td>ReplicaSet</td><td>dev-api-7c679b65c9</td><td>memory-request</td><td>128Mi</td><td>64Mi</td></tr><tr><td>monitoring</td><td>ReplicaSet</td><td>dashboard-7d865bd986</td><td>memory-request</td><td>128Mi</td><td>64Mi</td></tr></tbody>
+</table>
+</body>
+</html>

@@ -234,6 +234,96 @@ server = build_server(lambda: {"status": "ok"}, port=8080)
 server.serve_forever()
 ```
 
+## Screenshots
+
+### TUI dashboard
+
+The main namespace overview — wastes, pods, and monthly cost at a glance.
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="kube-saver TUI dashboard showing $406.79/mo waste across 7 namespaces and 21 pods" width="860" />
+</p>
+
+*Shown above: 7 namespaces, 21 pods, **$406.79/mo** total requested compute, 0% efficiency in provisioned namespaces.*
+
+---
+
+### Cost breakdown
+
+Drill into per-namespace CPU and memory waste in the dedicated cost view (press `2` in the TUI).
+
+<p align="center">
+  <img src="docs/screenshots/cost.png" alt="kube-saver cost dashboard showing per-namespace cost breakdown with $406.79/mo waste" width="860" />
+</p>
+
+*Annualized waste: **$4,881.51/yr** — $327.59/mo in prod alone.*
+
+---
+
+### Recommendations
+
+40 actionable right-sizing recommendations with current vs. suggested values, confidence, and potential savings (press `3` in the TUI).
+
+<p align="center">
+  <img src="docs/screenshots/recommendations.png" alt="kube-saver recommendations view showing 40 high-confidence rightsizing suggestions" width="860" />
+</p>
+
+*Potential savings: **$373.03/mo** from high-confidence recommendations alone.*
+
+---
+
+### CLI terminal output
+
+kube-saver also produces self-contained artifacts that work outside the terminal:
+
+| Output | Description |
+|--------|-------------|
+| `report.html` | Single-file HTML report — open in any browser, email as-is |
+| `pr-plan/` | Summary, apply-patches shell script, review.txt — ready for a PR |
+| `notifications/` | Daily waste summary + spike alert Markdown files |
+
+```text
+$ kube-saver report -o cost-report.html
+Report written to cost-report.html
+
+$ kube-saver pr-plan -d pr-plan/
+PR plan written to pr-plan/
+  - summary.md
+  - apply-patches.sh
+  - review.txt
+
+$ kube-saver notify -d notifications/
+Daily summary: notifications/daily-summary-2026-07-22.md
+Spike alert:   notifications/spike-alert-2026-07-22.md
+```
+
+---
+
+### All generated artifacts
+
+The following files are produced by a single `bash scripts/capture_cli.sh` run (requires a running cluster):
+
+| File | Purpose |
+|------|---------|
+| `docs/screenshots/dashboard.png` | Main TUI namespace view |
+| `docs/screenshots/cost.png` | Cost breakdown TUI view |
+| `docs/screenshots/recommendations.png` | Recommendations TUI view |
+| `docs/screenshots/report.html` | Self-contained HTML executive report |
+| `docs/screenshots/pr-plan/` | PR-ready plan (summary, patches, review) |
+| `docs/screenshots/notifications/` | Daily markdown summary + spike alert |
+
+To regenerate all screenshots locally:
+
+```bash
+# Capture TUI screenshots (requires running kind cluster with demo workloads)
+python scripts/capture_tui.py dashboard
+python scripts/capture_tui.py cost
+python scripts/capture_tui.py recommendations
+
+# Capture CLI artifacts
+bash scripts/capture_cli.sh
+```
+
 ## Configuration
 
 kube-saver lets you change both **currency** and **CPU/memory pricing** in a few lines — no code edits required.
