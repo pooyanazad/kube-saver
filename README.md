@@ -297,33 +297,6 @@ Daily summary: notifications/daily-summary-2026-07-22.md
 Spike alert:   notifications/spike-alert-2026-07-22.md
 ```
 
----
-
-### All generated artifacts
-
-The following files are produced by a single `bash scripts/capture_cli.sh` run (requires a running cluster):
-
-| File | Purpose |
-|------|---------|
-| `docs/screenshots/dashboard.png` | Main TUI namespace view |
-| `docs/screenshots/cost.png` | Cost breakdown TUI view |
-| `docs/screenshots/recommendations.png` | Recommendations TUI view |
-| `docs/screenshots/report.html` | Self-contained HTML executive report |
-| `docs/screenshots/pr-plan/` | PR-ready plan (summary, patches, review) |
-| `docs/screenshots/notifications/` | Daily markdown summary + spike alert |
-
-To regenerate all screenshots locally:
-
-```bash
-# Capture TUI screenshots (requires running kind cluster with demo workloads)
-python scripts/capture_tui.py dashboard
-python scripts/capture_tui.py cost
-python scripts/capture_tui.py recommendations
-
-# Capture CLI artifacts
-bash scripts/capture_cli.sh
-```
-
 ## Configuration
 
 kube-saver lets you change both **currency** and **CPU/memory pricing** in a few lines — no code edits required.
