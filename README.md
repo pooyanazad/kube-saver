@@ -133,9 +133,11 @@ Notifications are written to local Markdown files, PR output is generated as loc
 
 ## Installation
 
-For contribution and development workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+```bash
+pip install kube-saver
+```
 
-### Local development install
+If you install from source:
 
 ```bash
 git clone https://github.com/pooyanazad/kube-saver.git
@@ -145,38 +147,65 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-### Minimal install
+Optional eBPF support (requires host kernel capabilities and BCC):
 
 ```bash
-pip install -e .
+pip install kube-saver[ebpf]
 ```
 
-### Optional eBPF support
-
-```bash
-pip install -e .[ebpf]
-```
-
-> Note: eBPF support also depends on host kernel capabilities and BCC availability.
+For contribution and development workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Quick Start
 
-### Launch the TUI
+### One-command path
+
+Connect to any cluster with `kubectl`, then run one of these:
 
 ```bash
-source .venv/bin/activate
+# Open the interactive terminal dashboard
+kube-saver
+
+# Generate a self-contained HTML cost report
+kube-saver report -o cost-report.html
+```
+
+The TUI opens immediately. The HTML report takes about as long as `kubectl get pods` — then you have a file you can open in any browser, email to anyone, or drop into a CI artifact.
+
+### First run guide by environment
+
+**Local cluster (kind, minikube, Docker Desktop):**
+
+```bash
+# Make sure your local cluster is running
+kubectl cluster-info
 kube-saver
 ```
 
-### CLI commands
+**AWS EKS:**
 
 ```bash
-kube-saver tui
-kube-saver report -o kube-saver-report.html
-kube-saver pr-plan -d ./kube-saver-pr
-kube-saver notify -d ./kube-saver-notify --threshold 250
-kube-saver serve -p 8080 -b 127.0.0.1
-kube-saver version
+# Make sure your kubeconfig is current
+aws eks update-kubeconfig --name my-cluster --region us-east-1
+kube-saver
+```
+
+**Generic kubeconfig:**
+
+```bash
+# kube-saver uses the same kubeconfig kubectl uses
+export KUBECONFIG=/path/to/kubeconfig
+kube-saver
+```
+
+### All CLI commands
+
+```bash
+kube-saver           # open the interactive TUI dashboard
+kube-saver report -o cost-report.html    # self-contained HTML report
+kube-saver pr-plan -d ./pr-files         # generate local PR plan files
+kube-saver notify -d ./alerts --threshold 250   # write spike/daily alerts to files
+kube-saver serve -p 8080 -b 127.0.0.1     # local read-only HTTP API
+kube-saver version                        # print version
 ```
 
 ### Generate default config YAML
