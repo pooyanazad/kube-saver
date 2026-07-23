@@ -4,6 +4,18 @@ Thanks for contributing to kube-saver.
 
 This project aims to stay practical, self-contained, and production-oriented. Contributions should improve reliability, clarity, and operator usefulness without adding unnecessary service dependencies.
 
+## Documentation
+
+Before opening an issue or PR, check the docs:
+
+- **[Getting started](docs/getting-started.md)** — install, first run, environment setup
+- **[CLI reference](docs/cli-reference.md)** — every command and flag
+- **[Configuration](docs/configuration.md)** — config keys and environment variables
+- **[Architecture](docs/architecture.md)** — module map and data flow
+- **[Troubleshooting](docs/troubleshooting.md)** — common issues and fixes
+- **[Comparison](docs/comparison.md)** — vs k9s, Goldilocks, VPA, Kubecost
+- **[Safety & trust](docs/safety.md)** — RBAC, recommendation boundaries, trust model
+
 ## Principles
 
 - Keep the tool self-contained where possible.
@@ -92,15 +104,27 @@ A good pull request description should explain:
 
 ## Reporting issues
 
+Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml) when opening an issue. It captures the version, cluster type, command, and error output needed to reproduce the problem.
+
+For questions, use the [question template](.github/ISSUE_TEMPLATE/question.yml) or start a [GitHub Discussion](https://github.com/pooyanazad/kube-saver/discussions).
+
 When opening an issue, include:
 
-- kube-saver version
+- kube-saver version (`kube-saver version`)
 - Python version
 - Kubernetes context/environment
 - exact command used
 - expected behavior
 - actual behavior
 - relevant logs or screenshots
+
+## Agent and automation
+
+kube-saver supports programmatic use from Python scripts and CI pipelines. See:
+
+- [CLI reference](docs/cli-reference.md) for all commands and exit codes
+- [Getting started](docs/getting-started.md#5-daily--ci-use) for CI examples
+- [JSON output helpers](docs/cli-reference.md#python-helpers) for embedding in automation
 
 ## Security
 
