@@ -1,0 +1,25 @@
+name: Question
+description: Ask about how kube-saver works or how to do something.
+labels: question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For quick questions, [GitHub Discussions](https://github.com/pooyanazad/kube-saver/discussions) is a better fit than an issue.
+        Questions as issues are fine if you prefer — we'll convert it to a discussion if appropriate.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: Be specific. Include your cluster type and what you were trying to do.
+      placeholder: |
+        How do I configure kube-saver to use EUR instead of USD?
+        Is there a way to run kube-saver against multiple clusters at once?
+        What does the "efficiency: 0%" mean in the TUI?
+
+  - type: input
+    id: version
+    attributes:
+      label: kube-saver version
+      placeholder: "e.g. 1.2.0"

@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new feature or improvement.
+labels: enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome. Please describe what you want to achieve and why it matters to you.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or pain point
+      description: What problem are you trying to solve? What is frustrating or missing today?
+      placeholder: |
+        Currently kube-saver cannot ...
+        When I run ... I wish it would ...
+        I need to be able to ...
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you would like to see. Be specific about the command, output format, or behavior.
+      placeholder: |
+        I would like `kube-saver --flag` to output ...
+        A new command `kube-saver new-cmd` that ...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or alternative tools you've tried?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who benefits from this? How often would it be used?
