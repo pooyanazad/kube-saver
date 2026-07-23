@@ -180,16 +180,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Sync Docker Hub description
-        continue-on-error: true
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver
-          short-description: Self-contained Kubernetes cost and waste visibility tool.
-          readme-filepath: ./README.md
-
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
