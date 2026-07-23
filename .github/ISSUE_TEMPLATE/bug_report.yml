@@ -1,0 +1,107 @@
+name: Bug report
+description: Report something that is broken or behaves unexpectedly.
+labels: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out this template completely — incomplete reports are harder to act on.
+
+        **Before submitting:** check the [troubleshooting docs](docs/troubleshooting.md) and [open issues](https://github.com/pooyanazad/kube-saver/issues) to see if this is already known.
+
+  - type: input
+    id: version
+    attributes:
+      label: kube-saver version
+      description: Run `kube-saver version` to get the exact version.
+      placeholder: "e.g. 1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - pip install (PyPI)
+        - pip install from source (git clone)
+        - Docker image
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cluster
+    attributes:
+      label: Cluster type
+      options:
+        - kind (local)
+        - minikube (local)
+        - Docker Desktop (local)
+        - AWS EKS
+        - GCP GKE
+        - Azure AKS
+        - k3s / k3d
+        - Generic kubeconfig (other)
+    validations:
+      required: true
+
+  - type: input
+    id: context
+    attributes:
+      label: kubeconfig context name
+      description: Run `kubectl config current-context` to find it.
+      placeholder: "e.g. kind-demo, arn:aws:eks:us-east-1:123456:cluster/prod"
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime data source
+      options:
+        - eBPF
+        - metrics-server
+        - Estimates only (no metrics-server, no eBPF)
+        - Unknown / not sure
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command run
+      description: Include all flags and arguments.
+      placeholder: "kube-saver report -o /tmp/report.html"
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output or error message
+      description: Paste the complete output including any tracebacks.
+      placeholder: |
+        $ kube-saver report -o /tmp/report.html
+        Traceback (most recent call last):
+          File "...", line 12, in <module>
+            ...
+        Error: connection refused
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened.
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Run with verbose logging if helpful:
+        KUBE_SAVER_LOG_LEVEL=debug kube-saver ... 2>&1 | head -50
