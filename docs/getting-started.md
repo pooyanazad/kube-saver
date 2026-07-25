@@ -21,7 +21,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Optional eBPF support — gives the most accurate runtime data, but requires BCC bindings and host kernel capabilities:
+Optional eBPF support, gives the most accurate runtime data, but requires BCC bindings and host kernel capabilities:
 
 ```bash
 pip install "kube-saver[ebpf]"
@@ -57,7 +57,7 @@ Any `[fail]` line tells you exactly what to fix. See [Troubleshooting](troublesh
 
 ## 3. Run by environment
 
-### Local cluster — kind / minikube / Docker Desktop
+### Local cluster, kind / minikube / Docker Desktop
 
 ```bash
 # Make sure your local cluster is running
@@ -67,7 +67,7 @@ kubectl cluster-info
 kube-saver
 ```
 
-If you want demo data to play with, the repo ships a manifest at `demo/big-demo.yaml` that creates 7 namespaces with over-provisioned workloads — enough to populate the dashboard with realistic numbers.
+If you want demo data to play with, the repo ships a manifest at `demo/big-demo.yaml` that creates 7 namespaces with over-provisioned workloads, enough to populate the dashboard with realistic numbers.
 
 ### AWS EKS
 
@@ -106,7 +106,7 @@ The fastest path to a real, shareable artifact:
 kube-saver report -o cost-report.html && open cost-report.html
 ```
 
-The HTML file has no external assets, no CDN, and no JavaScript dependencies — it works offline, in an email attachment, and in a CI artifact.
+The HTML file has no external assets, no CDN, and no JavaScript dependencies, it works offline, in an email attachment, and in a CI artifact.
 
 If you want a TUI session:
 
@@ -166,6 +166,7 @@ For a CI artifact with self-contained HTML:
 
 ## Next steps
 
-- [CLI reference](cli-reference.md) — every command and flag
-- [Configuration](configuration.md) — change currency, pricing, alerts
-- [Architecture](architecture.md) — how the pieces fit together
+- [CLI reference](cli-reference.md), every command and flag
+- [Configuration](configuration.md), change currency, pricing, alerts
+- [Architecture](architecture.md), how the pieces fit together
+- [Support matrix](support-matrix.md), what kube-saver supports

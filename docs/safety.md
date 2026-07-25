@@ -6,10 +6,10 @@ This document explains what kube-saver will never do, how it protects your workl
 
 ## Design principles
 
-1. **Read-only by default** — kube-saver never changes anything in your cluster unless you explicitly run the apply script from a PR plan. Even then, you review the script first.
-2. **No data leaves your machine** — no telemetry, no analytics, no hosted service, no network calls other than to your Kubernetes API.
-3. **Degrades safely** — if a runtime source is unavailable, kube-saver falls back to the next source instead of crashing.
-4. **Recommends conservatively** — the recommendation engine avoids unsafe suggestions by design (see below).
+1. **Read-only by default**, kube-saver never changes anything in your cluster unless you explicitly run the apply script from a PR plan. Even then, you review the script first.
+2. **No data leaves your machine**, no telemetry, no analytics, no hosted service, no network calls other than to your Kubernetes API.
+3. **Degrades safely**, if a runtime source is unavailable, kube-saver falls back to the next source instead of crashing.
+4. **Recommends conservatively**, the recommendation engine avoids unsafe suggestions by design (see below).
 
 ---
 
@@ -35,7 +35,7 @@ The right-sizing engine applies these guardrails:
 | **Stateful workload detection** | StatefulSets and pods with PVCs get a larger safety margin |
 | **Critical namespace protection** | Namespaces matching your `critical_namespaces` config list get a larger buffer |
 | **Minimum resource floor** | CPU and memory recommendations are clamped to minimums (50m CPU, 64Mi memory) |
-| **Confidence score** | Every recommendation has a confidence level — only high-confidence ones appear in PR plans |
+| **Confidence score** | Every recommendation has a confidence level, only high-confidence ones appear in PR plans |
 
 These guardrails are not optional. They are baked into the recommendation engine and cannot be disabled in config.
 
@@ -50,7 +50,7 @@ exclude_annotations:
 
 ---
 
-## RBAC — minimum required permissions
+## RBAC, minimum required permissions
 
 kube-saver needs only **list** and **get** on a small set of resources. Here is the minimal RBAC manifest:
 
@@ -90,7 +90,7 @@ roleRef:
 
 For namespace-scoped access, replace `ClusterRole` / `ClusterRoleBinding` with `Role` / `RoleBinding` in each target namespace.
 
-> **Note:** The `metrics.k8s.io` group is only needed if metrics-server is running. kube-saver works without it — it just falls back to estimates.
+> **Note:** The `metrics.k8s.io` group is only needed if metrics-server is running. kube-saver works without it, it just falls back to estimates.
 
 ---
 
@@ -99,8 +99,8 @@ For namespace-scoped access, replace `ClusterRole` / `ClusterRoleBinding` with `
 The built-in HTTP server (`kube-saver serve`) is:
 
 - **Loopback-only by default** (`127.0.0.1`)
-- **Read-only** — no mutation endpoints
-- **No authentication** — because it is not designed to be exposed
+- **Read-only**, no mutation endpoints
+- **No authentication**, because it is not designed to be exposed
 
 If you need to expose it in a shared environment, put it behind a reverse proxy with auth and TLS. Do not bind it to `0.0.0.0` directly.
 
@@ -112,9 +112,9 @@ kube-saver displays which runtime source it is using in every view. The accuracy
 
 | Source | Accuracy | When you get it |
 |---|---|---|
-| eBPF | Highest — kernel-level, per-container CPU | BCC installed, root, host kernel access |
-| metrics-server | Good — cluster-aggregated CPU/memory | metrics-server running |
-| Estimates | Conservative — request-based only | Neither of the above available |
+| eBPF | Highest, kernel-level, per-container CPU | BCC installed, root, host kernel access |
+| metrics-server | Good, cluster-aggregated CPU/memory | metrics-server running |
+| Estimates | Conservative, request-based only | Neither of the above available |
 
 Falling back to estimates is not a bug. The TUI and reports always tell you which source is active so you can judge how much to trust the numbers.
 

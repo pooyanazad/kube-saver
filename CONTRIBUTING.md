@@ -8,13 +8,13 @@ This project aims to stay practical, self-contained, and production-oriented. Co
 
 Before opening an issue or PR, check the docs:
 
-- **[Getting started](docs/getting-started.md)** — install, first run, environment setup
-- **[CLI reference](docs/cli-reference.md)** — every command and flag
-- **[Configuration](docs/configuration.md)** — config keys and environment variables
-- **[Architecture](docs/architecture.md)** — module map and data flow
-- **[Troubleshooting](docs/troubleshooting.md)** — common issues and fixes
-- **[Comparison](docs/comparison.md)** — vs k9s, Goldilocks, VPA, Kubecost
-- **[Safety & trust](docs/safety.md)** — RBAC, recommendation boundaries, trust model
+- **[Getting started](docs/getting-started.md)**, install, first run, environment setup
+- **[CLI reference](docs/cli-reference.md)**, every command and flag
+- **[Configuration](docs/configuration.md)**, config keys and environment variables
+- **[Architecture](docs/architecture.md)**, module map and data flow
+- **[Troubleshooting](docs/troubleshooting.md)**, common issues and fixes
+- **[Comparison](docs/comparison.md)**, vs k9s, Goldilocks, VPA, Kubecost
+- **[Safety & trust](docs/safety.md)**, RBAC, recommendation boundaries, trust model
 
 ## Principles
 
@@ -36,13 +36,13 @@ pip install -e .[dev]
 
 ## Project layout
 
-- `src/kube_saver/collectors/` — Kubernetes and runtime data collection
-- `src/kube_saver/analyzers/` — waste, health, alerts, and cost analysis
-- `src/kube_saver/recommenders/` — recommendation generation
-- `src/kube_saver/exporters/` — reports, notifications, local PR plans, structured output
-- `src/kube_saver/tui/` — Textual application and data loading
-- `src/kube_saver/server.py` — read-only HTTP API
-- `tests/` — automated test suite
+- `src/kube_saver/collectors/`, Kubernetes and runtime data collection
+- `src/kube_saver/analyzers/`, waste, health, alerts, and cost analysis
+- `src/kube_saver/recommenders/`, recommendation generation
+- `src/kube_saver/exporters/`, reports, notifications, local PR plans, structured output
+- `src/kube_saver/tui/`, Textual application and data loading
+- `src/kube_saver/server.py`, read-only HTTP API
+- `tests/`, automated test suite
 
 ## Versioning
 
@@ -101,6 +101,12 @@ A good pull request description should explain:
 - Prefer explicit, readable code over clever code.
 - Add or update tests for bug fixes and user-visible behavior changes.
 - Keep release and packaging behavior reproducible.
+
+## Pre-release testing
+
+Before tagging a release, verify kube-saver against a local cluster, a managed
+cloud cluster, and a restricted RBAC environment. See
+**[Release testing guide](docs/release-testing.md)** for the full procedure.
 
 ## Reporting issues
 
