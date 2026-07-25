@@ -169,3 +169,4 @@ For a CI artifact with self-contained HTML:
 - [CLI reference](cli-reference.md) — every command and flag
 - [Configuration](configuration.md) — change currency, pricing, alerts
 - [Architecture](architecture.md) — how the pieces fit together
+- [Support matrix](support-matrix.md) — what kube-saver supports
