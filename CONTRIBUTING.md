@@ -102,6 +102,12 @@ A good pull request description should explain:
 - Add or update tests for bug fixes and user-visible behavior changes.
 - Keep release and packaging behavior reproducible.
 
+## Pre-release testing
+
+Before tagging a release, verify kube-saver against a local cluster, a managed
+cloud cluster, and a restricted RBAC environment. See
+**[Release testing guide](docs/release-testing.md)** for the full procedure.
+
 ## Reporting issues
 
 Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml) when opening an issue. It captures the version, cluster type, command, and error output needed to reproduce the problem.
