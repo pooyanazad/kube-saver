@@ -40,7 +40,7 @@ kube-saver uses the first available source in this order:
 | 3 | Estimates | Request-based only | Nothing extra |
 
 The source is shown in the TUI status bar and in every generated report.
-Falling back is **not an error** — it is by design. kube-saver degrades gracefully instead of crashing.
+Falling back is **not an error**, it is by design. kube-saver degrades gracefully instead of crashing.
 
 ---
 
@@ -66,11 +66,11 @@ All outputs are designed to be self-contained and dependency-free:
 
 | Output | External dependencies |
 |---|---|
-| HTML report | None — inline CSS, no CDN, no JS |
-| JSON / YAML / Helm values | None — standard formats |
-| Prometheus metrics | None — standard exposition format |
-| PR plan files | None — plain Markdown and Bash |
-| Notifications | None — plain Markdown |
+| HTML report | None, inline CSS, no CDN, no JS |
+| JSON / YAML / Helm values | None, standard formats |
+| Prometheus metrics | None, standard exposition format |
+| PR plan files | None, plain Markdown and Bash |
+| Notifications | None, plain Markdown |
 | HTTP API | Loopback only by default; no external auth |
 
 See [Self-contained outputs](self-contained.md) for the design rationale.

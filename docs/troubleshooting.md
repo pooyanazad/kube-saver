@@ -18,9 +18,9 @@ Common issues and how to fix them. If something is missing here, open an issue.
   ```bash
   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
   ```
-- If metrics-server is running but kube-saver is not using it, check RBAC — you need `list` and `get` on `metrics.k8s.io` pods and nodes. See [Safety & trust](safety.md#rbac).
+- If metrics-server is running but kube-saver is not using it, check RBAC, you need `list` and `get` on `metrics.k8s.io` pods and nodes. See [Safety & trust](safety.md#rbac).
 
-Falling back to estimates is not an error — kube-saver is still working. The TUI status bar shows which source is active.
+Falling back to estimates is not an error, kube-saver is still working. The TUI status bar shows which source is active.
 
 ---
 
@@ -98,7 +98,7 @@ If eBPF is not available, kube-saver falls back to metrics-server automatically.
 **What to do:**
 
 - Open in a recent version of Chrome, Firefox, Safari, or Edge.
-- The report uses only inline CSS and standard HTML — no JavaScript, no external assets. It should work in any browser from 2020 onward.
+- The report uses only inline CSS and standard HTML, no JavaScript, no external assets. It should work in any browser from 2020 onward.
 
 ---
 
@@ -120,7 +120,7 @@ If eBPF is not available, kube-saver falls back to metrics-server automatically.
 
 **What to do:**
 
-- Check which runtime source is active — estimates are less accurate than metrics-server or eBPF.
+- Check which runtime source is active, estimates are less accurate than metrics-server or eBPF.
 - If a workload is intentionally bursty, annotate it with `kube-saver.io/ignore: "true"` to exclude it from recommendations.
 - Adjust the headroom buffer in config if your workloads need more or less margin:
   ```yaml

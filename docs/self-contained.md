@@ -18,7 +18,7 @@ If the kube-saver repository disappeared tomorrow, every release artifact and ev
 - Works offline in any browser
 - Safe to email as an attachment or commit to a repository
 - Contains the full waste breakdown, cost table, and recommendation list as of the generation time
-- The report is a snapshot — it does not fetch live data
+- The report is a snapshot, it does not fetch live data
 
 ### PR plan files (`kube-saver pr-plan`)
 
@@ -73,11 +73,11 @@ Standard Prometheus exposition format at `GET /metrics` when the HTTP server is 
 
 Most cost tools need a hosted dashboard, a Prometheus stack, or a cloud billing integration. kube-saver deliberately avoids all three:
 
-- **Faster to try** — no account, no API key, no infrastructure to set up
-- **Works anywhere** — local clusters, air-gapped environments, CI runners, laptops
-- **No data leaves your machine** — important for regulated and security-conscious environments
-- **No single point of failure** — if we go offline, nothing in your workflow breaks
-- **No supply chain risk from hosted dependencies** — no CDN to go down, no API to change
+- **Faster to try**, no account, no API key, no infrastructure to set up
+- **Works anywhere**, local clusters, air-gapped environments, CI runners, laptops
+- **No data leaves your machine**, important for regulated and security-conscious environments
+- **No single point of failure**, if we go offline, nothing in your workflow breaks
+- **No supply chain risk from hosted dependencies**, no CDN to go down, no API to change
 
 The tradeoff: kube-saver gives you a snapshot, not a live dashboard. It tells you where the waste is right now and gives you a plan to fix it. It does not replace live monitoring or autoscaling.
 

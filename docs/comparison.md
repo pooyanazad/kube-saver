@@ -1,4 +1,4 @@
-# Comparison — kube-saver vs alternatives
+# Comparison, kube-saver vs alternatives
 
 kube-saver is not a replacement for every Kubernetes tool. It occupies a specific niche: **dollar-first, offline, shareable cost visibility**. This document explains where it fits relative to the tools teams usually compare it to.
 
@@ -25,7 +25,7 @@ kube-saver is not a replacement for every Kubernetes tool. It occupies a specifi
 | | kube-saver | k9s |
 |---|---|---|
 | **Focus** | Cost visibility and recommendations | Cluster navigation and operations |
-| **Dollar costs** | Yes — every view shows monthly cost | No |
+| **Dollar costs** | Yes, every view shows monthly cost | No |
 | **Pod operations** | Read-only, recommendation-focused | Full pod lifecycle (logs, exec, delete) |
 | **When to use** | "Where is our money going?" | "What is running right now and can I fix it?" |
 
@@ -52,10 +52,10 @@ Goldilocks is a good right-sizing tool. kube-saver gives you the same recommenda
 | | kube-saver | VPA |
 |---|---|---|
 | **Focus** | Audit and recommend | Live auto-resize |
-| **Changes resources?** | No — generates a plan you review | Yes — mutates pod specs in-cluster |
+| **Changes resources?** | No, generates a plan you review | Yes, mutates pod specs in-cluster |
 | **Dollar cost** | Yes | No |
-| **Risk model** | Zero — read-only, you apply changes | Medium — can disrupt workloads |
-| **Self-contained output** | Yes | No — cluster-bound |
+| **Risk model** | Zero, read-only, you apply changes | Medium, can disrupt workloads |
+| **Self-contained output** | Yes | No, cluster-bound |
 
 VPA and kube-saver work together: kube-saver shows you the dollar problem and generates a plan; VPA handles the live autoscaling once you are confident.
 
