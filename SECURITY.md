@@ -23,7 +23,7 @@ Only the latest stable release receives security updates.
 
 **Not** security vulnerabilities:
 - High resource usage on large clusters (use resource limits)
-- Information disclosure about resource waste (by design — kube-saver's purpose)
+- Information disclosure about resource waste (by design, kube-saver's purpose)
 - Denial of service via a misconfigured or unresponsive metrics-server
   (kube-saver handles this gracefully and falls back to estimates)
 
@@ -45,13 +45,13 @@ Please include:
 
 - **Initial acknowledgment**: within 48 hours
 - **Severity assessment**: within 5 business days
-- **Fix timeline**: depends on severity — critical issues get an immediate patch;
+- **Fix timeline**: depends on severity, critical issues get an immediate patch;
   low-severity issues are addressed in the next scheduled release
 
 ## Scope
 
 kube-saver uses your existing kubeconfig credentials. The security of those
-credentials is outside kube-saver's scope — protect your kubeconfig as you
+credentials is outside kube-saver's scope, protect your kubeconfig as you
 would any other sensitive credential.
 
 kube-saver makes no network requests except to the Kubernetes API server

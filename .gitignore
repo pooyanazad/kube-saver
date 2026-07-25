@@ -1,8 +1,6 @@
 # --- Personal planning files (DO NOT COMMIT) ---
-# These are local planning docs, never push them
-PLAN.md
-STEPS.md
-imporvment
+# Local planning docs, drafts, and outreach posts. Never push these.
+local/
 
 # Python
 __pycache__/
@@ -54,5 +52,3 @@ htmlcov/
 .kube-saver/
 .kube-saver.db
 .kube-saver.cache
-README.fa.md
-imporvment

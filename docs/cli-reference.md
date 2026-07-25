@@ -39,7 +39,7 @@ kube-saver report -o cost-report.html
 | `--json PATH` | Also write a JSON summary alongside the HTML |
 | `--config PATH` | Use a non-default config file |
 
-The HTML is fully portable — no CDN, no external assets, works in any browser offline.
+The HTML is fully portable, no CDN, no external assets, works in any browser offline.
 
 ### `kube-saver pr-plan`
 
@@ -59,7 +59,7 @@ Files produced:
 |---|---|
 | `summary.md` | One-page summary of recommendations and savings |
 | `review.txt` | Detailed change list with current vs. suggested values and reasoning |
-| `apply-patches.sh` | Bash script with the recommended resource changes (does **not** auto-apply — review first) |
+| `apply-patches.sh` | Bash script with the recommended resource changes (does **not** auto-apply, review first) |
 | `README.md` | Context and instructions for the reviewer |
 
 ### `kube-saver notify`
@@ -86,9 +86,9 @@ kube-saver serve -p 8080 -b 127.0.0.1
 | Flag | Description |
 |---|---|
 | `-p, --port PORT` | TCP port (default: 8080) |
-| `-b, --bind HOST` | Bind address (default: 127.0.0.1 — loopback only) |
+| `-b, --bind HOST` | Bind address (default: 127.0.0.1, loopback only) |
 
-The API is intentionally minimal: `GET /health` and `GET /report` (latest snapshot). It is not an OAuth-aware public API. If you bind it to `0.0.0.0` you are responsible for putting it behind a reverse proxy with auth — see [Safety & trust](safety.md#http-api).
+The API is intentionally minimal: `GET /health` and `GET /report` (latest snapshot). It is not an OAuth-aware public API. If you bind it to `0.0.0.0` you are responsible for putting it behind a reverse proxy with auth, see [Safety & trust](safety.md#http-api).
 
 ### `kube-saver version`
 
@@ -146,7 +146,7 @@ All commands use stable exit codes for automation:
 | `2` | Invalid configuration |
 | `3` | Cluster unreachable |
 | `4` | Insufficient RBAC permissions |
-| `5` | Runtime source unavailable (eBPF / metrics-server) — non-fatal; falls back to estimates |
+| `5` | Runtime source unavailable (eBPF / metrics-server), non-fatal; falls back to estimates |
 
 ---
 

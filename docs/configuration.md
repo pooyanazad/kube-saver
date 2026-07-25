@@ -29,8 +29,8 @@ All prices are in USD per hour. Defaults are reasonable for general-purpose clou
 
 ```yaml
 pricing:
-  cpu_per_core_hour_usd: 0.040    # default — ~$29/core/month
-  memory_per_gb_hour_usd: 0.005   # default — ~$3.65/GB/month
+  cpu_per_core_hour_usd: 0.040    # default, ~$29/core/month
+  memory_per_gb_hour_usd: 0.005   # default, ~$3.65/GB/month
 ```
 
 Override at runtime:
@@ -65,7 +65,7 @@ cloud_provider: aws                # aws, gcp, azure, generic
 provider_tier: general             # general, compute_opt, memory_opt, spot
 ```
 
-These are hints only — kube-saver does not contact your cloud account. They help it select reasonable default pricing for the pricing model you are running.
+These are hints only, kube-saver does not contact your cloud account. They help it select reasonable default pricing for the pricing model you are running.
 
 ---
 
