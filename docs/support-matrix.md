@@ -129,3 +129,9 @@ Run `kube-saver doctor` (or `python -m kube_saver.cli doctor`) to check:
 If you run kube-saver on a combination not listed here and it works, please
 open an issue or pull request so we can add it. Same if it doesn't work —
 that is more important to know.
+
+## Pre-release testing
+
+Before each release, kube-saver is tested against three cluster environments:
+local, managed cloud, and restricted RBAC. See
+[Release testing](release-testing.md) for the procedure.
