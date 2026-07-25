@@ -89,7 +89,7 @@ Run the verification:
 What to confirm beyond the local checks:
 
 - API server reachable without timing out
-- `metrics-server` is installed and reporting real numbers (otherwise kube-saver falls back to estimates — that's fine, just confirm it)
+- `metrics-server` is installed and reporting real numbers (otherwise kube-saver falls back to estimates, that's fine, just confirm it)
 - Real cost numbers appear in the report (not all zeros)
 - Recommendations make sense for the workloads running there
 

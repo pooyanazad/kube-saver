@@ -1,7 +1,7 @@
 # Support matrix
 
 This page documents what kube-saver supports today. If you are running something
-not listed here, it will probably still work — this is what we have actually
+not listed here, it will probably still work, this is what we have actually
 tested.
 
 ## Project
@@ -11,7 +11,7 @@ tested.
 | Latest version   | see [GitHub releases](https://github.com/pooyanazad/kube-saver/releases) |
 | License          | MIT                                             |
 | Distribution     | PyPI (wheel + sdist), Docker Hub (`pooyanazad/kube-saver`) |
-| Release cadence  | as needed — no fixed schedule                   |
+| Release cadence  | as needed, no fixed schedule                   |
 
 ## Python
 
@@ -55,9 +55,9 @@ tested.
 | Component                                | Supported                    |
 | ---------------------------------------- | ---------------------------- |
 | Kubernetes API server (read-only)        | yes                          |
-| `metrics-server` (for actual usage)      | yes — required for real numbers |
-| eBPF runtime data (KubeScape-style)      | optional — improves accuracy  |
-| CRDs (any kind)                          | yes — kube-saver is read-only  |
+| `metrics-server` (for actual usage)      | yes, required for real numbers |
+| eBPF runtime data (KubeScape-style)      | optional, improves accuracy  |
+| CRDs (any kind)                          | yes, kube-saver is read-only  |
 | Server-side apply                        | not used                      |
 
 ### API server versions tested
@@ -68,7 +68,7 @@ tested.
 | 1.29    | tested    |
 | 1.28    | tested    |
 | 1.27    | tested    |
-| < 1.27  | not tested — probably works but not verified |
+| < 1.27  | not tested, probably works but not verified |
 
 ## Cluster types
 
@@ -97,7 +97,7 @@ kube-saver needs read access to the API. Tested against:
 | Cluster-admin (no restrictions)              | works     |
 | Read-only cluster role                       | works     |
 | Namespace-scoped read role                   | works     |
-| Tightly restricted (specific verbs only)     | works — `doctor` reports missing verbs |
+| Tightly restricted (specific verbs only)     | works, `doctor` reports missing verbs |
 
 For exact RBAC requirements, see [docs/safety.md](safety.md#read-only-rbac-recipe).
 
@@ -109,7 +109,7 @@ kube-saver picks the best available source automatically.
 | --------------- | ------------------------------------ | ------------- |
 | eBPF            | if available and supported by kernel | highest       |
 | metrics-server  | if eBPF is not available             | high          |
-| Estimates only  | if no metrics-server                 | rough — based on requests, not usage |
+| Estimates only  | if no metrics-server                 | rough, based on requests, not usage |
 
 ## How to verify your environment
 
@@ -122,12 +122,12 @@ Run `kube-saver doctor` (or `python -m kube_saver.cli doctor`) to check:
 - metrics-server is available (for real numbers)
 - current Python and kube-saver version
 
-`doctor` is non-destructive — it only reads cluster metadata and exits.
+`doctor` is non-destructive, it only reads cluster metadata and exits.
 
 ## Reporting unsupported configurations
 
 If you run kube-saver on a combination not listed here and it works, please
-open an issue or pull request so we can add it. Same if it doesn't work —
+open an issue or pull request so we can add it. Same if it doesn't work,
 that is more important to know.
 
 ## Pre-release testing

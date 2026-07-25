@@ -1,9 +1,9 @@
 # kube-saver
 
-> **See exactly where your Kubernetes money goes — then fix it.**
+> **See exactly where your Kubernetes money goes, then fix it.**
 
 A fast, offline, self-contained Kubernetes cost analyzer.
-Works from your kubeconfig alone — no cloud account, no SaaS signup, no hosted service.
+Works from your kubeconfig alone, no cloud account, no SaaS signup, no hosted service.
 Turns invisible cluster waste into visible dollar amounts you can act on in one command.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -28,11 +28,11 @@ Turns invisible cluster waste into visible dollar amounts you can act on in one 
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- **Real dollar amounts** for every namespace, workload, and pod — not just millicores
-- **Interactive TUI** — k9s-style keyboard navigation, cost and recommendation views
-- **Self-contained HTML report** — open in any browser, email as-is, no CDN
-- **Local PR plans** — review and apply right-sizing changes without touching a cloud API
-- **Markdown spike alerts** — daily summaries written to local files, no webhook needed
+- **Real dollar amounts** for every namespace, workload, and pod, not just millicores
+- **Interactive TUI**, k9s-style keyboard navigation, cost and recommendation views
+- **Self-contained HTML report**, open in any browser, email as-is, no CDN
+- **Local PR plans**, review and apply right-sizing changes without touching a cloud API
+- **Markdown spike alerts**, daily summaries written to local files, no webhook needed
 - **Three runtime sources**: eBPF → metrics-server → safe estimates
 
 ---
@@ -42,7 +42,7 @@ Turns invisible cluster waste into visible dollar amounts you can act on in one 
 <p align="center">
   <img src="docs/screenshots/dashboard.png" alt="kube-saver TUI dashboard" width="780" />
 </p>
-<p align="center"><em>Namespace overview — wastes, pods, and monthly cost at a glance.</em></p>
+<p align="center"><em>Namespace overview, wastes, pods, and monthly cost at a glance.</em></p>
 
 <p align="center">
   <img src="docs/screenshots/cost.png" alt="kube-saver cost breakdown" width="780" />
@@ -63,7 +63,7 @@ pip install kube-saver
 ```
 
 ```bash
-# Interactive TUI — opens immediately
+# Interactive TUI, opens immediately
 kube-saver
 
 # Self-contained HTML report
@@ -86,7 +86,7 @@ prod/auth-svc        mem-request  2.0Gi  → 64Mi     save ~$15/mo per replica
 staging/staging-api  cpu-request   300m  → 50m      save ~$7/mo per replica
 ```
 
-Real output from the demo cluster: **40 high-confidence recommendations, $373.03/mo potential savings** — see the [recommendations screenshot](docs/screenshots/recommendations.png).
+Real output from the demo cluster: **40 high-confidence recommendations, $373.03/mo potential savings**, see the [recommendations screenshot](docs/screenshots/recommendations.png).
 
 ---
 
@@ -103,7 +103,7 @@ Real output from the demo cluster: **40 high-confidence recommendations, $373.03
 | Works without hosted service | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 kube-saver's niche: **dollar-first, offline, shareable**.
-It does not replace live autoscaling — it gives you the number and the plan.
+It does not replace live autoscaling, it gives you the number and the plan.
 
 ---
 
@@ -125,9 +125,9 @@ kube-saver has **no hosted service, no account, and no external dependency**:
 
 - HTML reports are fully self-contained (inline CSS, no CDN, works offline)
 - Notifications are written to local Markdown files
-- PR plans are local review/apply files — no cloud API
+- PR plans are local review/apply files, no cloud API
 - The HTTP API is loopback-only by default
-- Releases are published via GitHub Actions — no PyPI token needed
+- Releases are published via GitHub Actions, no PyPI token needed
 
 If this repo disappeared tomorrow, every release artifact still works.
 
@@ -162,4 +162,4 @@ mypy src
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
