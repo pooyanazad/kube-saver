@@ -121,11 +121,13 @@ jobs:
       - name: Generate report via Docker against kind
         run: |
           mkdir -p smoke-out
-          # Mount kubeconfig to /tmp/kubeconfig (world-accessible) and pass
-          # KUBECONFIG explicitly. This avoids issues with HOME being
-          # reset to / when --user UID overrides the in-image user.
-          # Match container UID/GID to host so the mounted output dir is writable.
+          # Use --network host so the container can reach the kind API server
+          # (whose kubeconfig points at 127.0.0.1:<random port> on the host).
+          # --user overrides the in-image user; mount kubeconfig to
+          # /tmp/kubeconfig and pass KUBECONFIG explicitly because that
+          # override also resets HOME=/, breaking ~/.kube/config discovery.
           docker run --rm \
+            --network host \
             --user "$(id -u):$(id -g)" \
             -e KUBECONFIG=/tmp/kubeconfig \
             -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
@@ -145,6 +147,7 @@ jobs:
       - name: Run doctor in container
         run: |
           docker run --rm \
+            --network host \
             --user "$(id -u):$(id -g)" \
             -e KUBECONFIG=/tmp/kubeconfig \
             -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
