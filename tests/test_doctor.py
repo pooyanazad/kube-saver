@@ -234,6 +234,35 @@ class TestRunDoctorSuccess:
         for kind, verb in REQUIRED_RBAC:
             assert f"rbac {verb} {kind}" in names
 
+    def test_sar_constructs_resource_attributes(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Each RBAC check should be sent as a SAR with proper resource_attributes."""
+        cfg = tmp_path / "config"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+
+        fakes = _install_fake_kubernetes(
+            monkeypatch,
+            contexts=[{"name": "prod"}],
+            current_context={"name": "prod"},
+            sar_allowed=True,
+        )
+
+        run_doctor()
+        # Each SAR call should have used V1ResourceAttributes(resource=..., verb=...)
+        # and wrapped it in V1SelfSubjectAccessReviewSpec(resource_attributes=...).
+        client = fakes["client"]
+        assert client.V1ResourceAttributes.called, "V1ResourceAttributes was not constructed"
+        assert client.V1SelfSubjectAccessReviewSpec.called, "V1SelfSubjectAccessReviewSpec was not constructed"
+
+        # Verify resource/verb were passed to V1ResourceAttributes for at least one call.
+        ra_calls = client.V1ResourceAttributes.call_args_list
+        kinds_passed = {call.kwargs.get("resource") for call in ra_calls}
+        verbs_passed = {call.kwargs.get("verb") for call in ra_calls}
+        assert REQUIRED_RBAC[0][0] in kinds_passed
+        assert REQUIRED_RBAC[0][1] in verbs_passed
+
     def test_rbac_denied(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         cfg = tmp_path / "config"
         cfg.write_text("apiVersion: v1\n")

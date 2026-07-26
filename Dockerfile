@@ -23,7 +23,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /app
 
 RUN addgroup --system kube-saver \
-    && adduser --system --ingroup kube-saver --home /app kube-saver
+    && adduser --system --ingroup kube-saver --home /home/kube-saver kube-saver \
+    && mkdir -p /home/kube-saver/.kube \
+    && chown -R kube-saver:kube-saver /home/kube-saver
 
 COPY --from=builder /build/dist/*.whl /tmp/
 
