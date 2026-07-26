@@ -79,6 +79,25 @@ else
   bad "kube-saver report --help failed"
 fi
 
+hdr "5b. doctor command runs"
+if kube-saver doctor --help >/dev/null 2>&1; then
+  ok "kube-saver doctor --help works"
+else
+  bad "kube-saver doctor --help failed"
+fi
+
+DOCTOR_OUT="$TMP_DIR/doctor.txt"
+if kube-saver doctor >"$DOCTOR_OUT" 2>&1; then
+  ok "kube-saver doctor reports all-green"
+else
+  DOCTOR_EXIT=$?
+  if grep -q "kubeconfig" "$DOCTOR_OUT" 2>/dev/null; then
+    ok "kube-saver doctor exits $DOCTOR_EXIT (no kubeconfig — expected outside cluster)"
+  else
+    bad "kube-saver doctor exited $DOCTOR_EXIT unexpectedly"
+  fi
+fi
+
 hdr "6. Generate a real HTML report"
 REPORT_PATH="$TMP_DIR/report.html"
 if kube-saver report -o "$REPORT_PATH" >/dev/null 2>&1 && [ -s "$REPORT_PATH" ]; then
