@@ -14,6 +14,7 @@ on:
         type: string
 
 jobs:
+  # ── Fast feedback: lint + unit tests on every supported Python version ─
   lint:
     runs-on: ubuntu-latest
     strategy:
@@ -67,6 +68,7 @@ jobs:
       - name: Run tests
         run: pytest tests -q
 
+  # ── Build sdist + wheel and upload as artifacts ────────────────────────
   build:
     runs-on: ubuntu-latest
     needs: [lint, test]
@@ -98,91 +100,160 @@ jobs:
           name: dist
           path: dist/*
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+  # ── Smoke-test the built wheel in a fresh venv ─────────────────────────
+  smoke-wheel:
+    name: "Wheel smoke test (py${{ matrix.python-version }})"
     runs-on: ubuntu-latest
     needs: [build]
-    permissions:
-      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
 
-      - name: Download built artifacts
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download built wheel
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
 
-      - name: Generate release notes
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+      - name: Create fresh venv & install wheel
         run: |
-          prev_tag=$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$RELEASE_TAG" | head -n 1 || true)
-          {
-            echo "## kube-saver ${RELEASE_TAG}"
-            echo
-            echo "Production release for kube-saver with self-contained CLI, TUI, reporting, API, and Docker delivery."
-            echo
-            echo "### Included in this release"
-            echo "- Interactive TUI for Kubernetes cost and waste visibility"
-            echo "- Self-contained HTML report generation"
-            echo "- Local notification and PR-plan output"
-            echo "- Read-only HTTP API endpoints"
-            echo "- Docker image publication to Docker Hub"
-            echo
-            echo "### Build artifacts"
-            echo "- Python wheel and source distribution attached to this release"
-            echo "- SHA256 checksums included"
-            echo
-            echo "### Changes in this release"
-            if [[ -n "$prev_tag" ]]; then
-              git log --no-merges --pretty='- %s (%h)' "$prev_tag..HEAD"
-              echo
-              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${RELEASE_TAG}"
-            else
-              git log --no-merges --pretty='- %s (%h)'
-            fi
-          } > release_notes.md
+          python -m venv /tmp/smoke-venv
+          source /tmp/smoke-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          body_path: release_notes.md
-          files: |
-            dist/*
+      - name: Verify CLI on PATH
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          command -v kube-saver
 
-  docker:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      - name: Verify version
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          out="$(kube-saver version)"
+          echo "$out"
+          echo "$out" | grep -q "kube-saver"
+
+      - name: Verify --help lists all subcommands
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          help="$(kube-saver --help)"
+          for cmd in report pr-plan notify serve doctor; do
+            echo "$help" | grep -q "$cmd" || { echo "missing subcommand: $cmd"; exit 1; }
+          done
+
+      - name: Verify subcommand --help
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          kube-saver report --help
+          kube-saver notify --help
+          kube-saver serve --help
+          kube-saver doctor --help
+
+      - name: Verify doctor fails gracefully without kubeconfig
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          # No cluster → doctor must exit non-zero but NOT crash.
+          kube-saver doctor 2>&1 | grep -q "kubeconfig" || { echo "doctor did not mention kubeconfig"; exit 1; }
+          # Explicitly check non-zero exit.
+          kube-saver doctor && exit 1 || echo "doctor exited non-zero as expected (OK)"
+
+  # ── Smoke-test the Docker image against a kind cluster ──────────────────
+  smoke-docker:
+    name: "Docker smoke test (kind + report)"
     runs-on: ubuntu-latest
     needs: [build]
-    permissions:
-      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Create kind cluster
+        run: kind create cluster --name kube-saver-smoke --wait 60s
+
+      - name: Verify cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push image
+      - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver:${{ github.event.inputs.release_tag || github.ref_name }}
+          push: false
+          tags: kube-saver:smoke
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run version in container
+        run: docker run --rm kube-saver:smoke version
+
+      - name: Generate report via Docker against kind
+        run: |
+          mkdir -p smoke-out
+          # Use --network host so the container can reach the kind API server
+          # (whose kubeconfig points at 127.0.0.1:<random port> on the host).
+          # --user overrides the in-image user; mount kubeconfig to
+          # /tmp/kubeconfig and pass KUBECONFIG explicitly because that
+          # override also resets HOME=/, breaking ~/.kube/config discovery.
+          docker run --rm \
+            --network host \
+            --user "$(id -u):$(id -g)" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+            -v "$PWD/smoke-out:/out" \
+            kube-saver:smoke report -o /out/report.html
+
+      - name: Verify report is non-trivial
+        run: |
+          bytes="$(wc -c < smoke-out/report.html)"
+          echo "Report size: $bytes bytes"
+          if [ "$bytes" -le 1024 ]; then
+            echo "::error::Report suspiciously small ($bytes bytes)"
+            exit 1
+          fi
+          head -c 200 smoke-out/report.html
+
+      - name: Run doctor in container
+        run: |
+          docker run --rm \
+            --network host \
+            --user "$(id -u):$(id -g)" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+            kube-saver:smoke doctor
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-docker
+          path: smoke-out/
+
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name kube-saver-smoke || true
