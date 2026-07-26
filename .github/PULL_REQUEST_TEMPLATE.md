@@ -1,31 +1,82 @@
 ## Summary
 
-<!-- 1-3 sentences. What changed and why? -->
+<!--
+Briefly describe the purpose of this PR. What problem does it solve?
+If the change is visual, a screenshot or screen recording is welcome.
+-->
 
-## Type of change
+## Related
 
-<!-- Replace the brackets with [x]. Check both boxes that apply. -->
+<!--
+Fixes #ISSUE
+Relates to #ISSUE
+If none, write: None.
+-->
 
-- [ ] This PR addresses an **open issue** (link the issue below)
-- [ ] This is a **critical bug fix** protecting correctness, reliability, or release quality
-- [ ] This is a **Phase 7 / repo governance** change (docs, CI, templates, tooling)
+None.
 
-## What changed
+## Changes
 
-<!-- Describe the specific change. Be precise about the file and logic modified. -->
+<!--
+List the concrete changes in this PR. Be specific — mention files,
+functions, and the logic you added or modified. If the diff is large,
+group related changes into a few bullet points.
 
-## How to verify
+Example:
+- `src/kube_saver/doctor.py` — new `kube-saver doctor` subcommand with six diagnostic checks
+- `.github/workflows/ci.yml` — added `smoke-docker` job that builds and runs the image against kind
+-->
 
-<!-- What did you run to confirm this works? Include commands and expected output. -->
+-
 
-- [ ] `pytest -q` passes
-- [ ] `ruff check . && mypy kube_saver` pass
-- [ ] manual test:
+## Checklist
 
-## Operational / release impact
+### Before merge
+- [ ] `pytest -q` passes (158 tests)
+- [ ] `ruff check src tests` passes
+- [ ] `mypy src` passes
+- [ ] Manual smoke test completed (describe below)
 
-<!-- Does this affect any CLI output, exit codes, or file formats? Does it need a version bump? -->
+### If applicable
+- [ ] CLI help text, error messages, or output format changed — docs updated
+- [ ] Breaking change — version bump and migration note included
 
-## Notes for reviewers
+## Verification
 
-<!-- Anything that needs special attention? Related PRs or issues to understand? -->
+<!--
+How did you test this? Commands + expected output. Example:
+
+```
+$ docker build -t kube-saver:test .
+$ docker run --rm -e KUBECONFIG=/tmp/kubeconfig \
+    -v ~/.kube/config:/tmp/kubeconfig:ro \
+    kube-saver:test doctor
+kubeconfig: /tmp/kubeconfig
+  ✓ kubeconfig — found at /tmp/kubeconfig
+  ✓ context — active context is 'kind-kind'
+  ✓ cluster reachable — server reports v1.33.0
+$ echo $?
+0
+```
+-->
+
+```
+```
+
+## Release impact
+
+<!--
+Will users see any difference? New flags, changed defaults, removed
+features, output format changes? If nothing user-facing, write: None.
+-->
+
+None.
+
+## Post-merge
+
+<!--
+Steps needed after merge: deploy, announce, backport, etc.
+If none, write: None.
+-->
+
+None.

@@ -17,10 +17,8 @@ build
 *.egg-info
 .vscode
 .idea
-README.fa.md
-PLAN.md
-STEPS.md
 benchmarks
 examples
 scripts
 tests
+/local
