@@ -7,6 +7,7 @@ Subcommands::
     kube-saver pr-plan      Generate local PR plan files.
     kube-saver notify       Write daily summary + spike alert files.
     kube-saver serve        Start the HTTP API server.
+    kube-saver doctor       Check kubeconfig + cluster connectivity + RBAC.
     kube-saver version      Print version information.
 """
 
@@ -170,6 +171,22 @@ def serve(port: int, bind: str) -> None:
     except KeyboardInterrupt:
         click.echo("\nShutting down.")
         server.shutdown()
+
+
+# ── Doctor ────────────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("-c", "--context", default=None, help="Kubeconfig context to check (default: current).")
+def doctor(context: str | None) -> None:
+    """Check kubeconfig, context, cluster connectivity, and required permissions."""
+    from kube_saver.doctor import run_doctor
+
+    use_color = sys.stdout.isatty()
+    report = run_doctor(context=context)
+    click.echo(report.render(use_color=use_color))
+    if not report.ok:
+        raise SystemExit(1)
 
 
 # ── Version ───────────────────────────────────────────────────────────────
