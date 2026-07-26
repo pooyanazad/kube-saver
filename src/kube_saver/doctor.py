@@ -128,13 +128,15 @@ def _import_kubernetes() -> tuple[object | None, object | None, type | None]:
 def _authorize_with(k8s_client: object, kind: str, verb: str) -> bool:
     """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``."""
     try:
-        authorization = k8s_client.AuthorizationV1Api()
-        review = k8s_client.V1SelfSubjectAccessReview(
-            spec=k8s_client.V1SelfSubjectAccessReviewSpec(
-                resource=kind,
-                verb=verb,
-            )
+        resource_attrs = k8s_client.V1ResourceAttributes(
+            resource=kind,
+            verb=verb,
         )
+        spec = k8s_client.V1SelfSubjectAccessReviewSpec(
+            resource_attributes=resource_attrs,
+        )
+        review = k8s_client.V1SelfSubjectAccessReview(spec=spec)
+        authorization = k8s_client.AuthorizationV1Api()
         response = authorization.create_self_subject_access_review(review)
         return bool(response.status and response.status.allowed)
     except Exception as exc:  # noqa: BLE001
