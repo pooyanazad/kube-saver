@@ -1,0 +1,165 @@
+name: smoke
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ── Smoke-test the built wheel ──────────────────────────────────────────
+  smoke-wheel:
+    name: "Wheel smoke test (py${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Create fresh venv & install wheel
+        run: |
+          python -m venv /tmp/smoke-venv
+          source /tmp/smoke-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
+
+      - name: Verify CLI on PATH
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          command -v kube-saver
+
+      - name: Verify version
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          out="$(kube-saver version)"
+          echo "$out"
+          echo "$out" | grep -q "kube-saver"
+
+      - name: Verify --help lists all subcommands
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          help="$(kube-saver --help)"
+          for cmd in report pr-plan notify serve doctor; do
+            echo "$help" | grep -q "$cmd" || { echo "missing subcommand: $cmd"; exit 1; }
+          done
+
+      - name: Verify subcommand --help
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          kube-saver report --help
+          kube-saver notify --help
+          kube-saver serve --help
+          kube-saver doctor --help
+
+      - name: Verify doctor fails gracefully without kubeconfig
+        run: |
+          source /tmp/smoke-venv/bin/activate
+          # No cluster → doctor must exit non-zero but NOT crash.
+          kube-saver doctor 2>&1 | grep -q "kubeconfig" || { echo "doctor did not mention kubeconfig"; exit 1; }
+          # Explicitly check non-zero exit.
+          kube-saver doctor && exit 1 || echo "doctor exited non-zero as expected (OK)"
+
+  # ── Smoke-test the Docker image against a kind cluster ──────────────────
+  smoke-docker:
+    name: "Docker smoke test (kind + report)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Create kind cluster
+        run: kind create cluster --name kube-saver-smoke --wait 60s
+
+      - name: Verify cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: kube-saver:smoke
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run version in container
+        run: docker run --rm kube-saver:smoke version
+
+      - name: Generate report via Docker against kind
+        run: |
+          mkdir -p smoke-out
+          # Use --network host so the container can reach the kind API server
+          # (whose kubeconfig points at 127.0.0.1:<random port> on the host).
+          # --user overrides the in-image user; mount kubeconfig to
+          # /tmp/kubeconfig and pass KUBECONFIG explicitly because that
+          # override also resets HOME=/, breaking ~/.kube/config discovery.
+          docker run --rm \
+            --network host \
+            --user "$(id -u):$(id -g)" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+            -v "$PWD/smoke-out:/out" \
+            kube-saver:smoke report -o /out/report.html
+
+      - name: Verify report is non-trivial
+        run: |
+          bytes="$(wc -c < smoke-out/report.html)"
+          echo "Report size: $bytes bytes"
+          if [ "$bytes" -le 1024 ]; then
+            echo "::error::Report suspiciously small ($bytes bytes)"
+            exit 1
+          fi
+          head -c 200 smoke-out/report.html
+
+      - name: Run doctor in container
+        run: |
+          docker run --rm \
+            --network host \
+            --user "$(id -u):$(id -g)" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+            kube-saver:smoke doctor
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-docker
+          path: smoke-out/
+
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name kube-saver-smoke || true
