@@ -121,7 +121,9 @@ jobs:
       - name: Generate report via Docker against kind
         run: |
           mkdir -p smoke-out
+          # Match container UID/GID to host so the mounted output dir is writable.
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
             -v "$PWD/smoke-out:/out" \
             kube-saver:smoke report -o /out/report.html
@@ -139,6 +141,7 @@ jobs:
       - name: Run doctor in container
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
             kube-saver:smoke doctor
 

@@ -14,6 +14,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ REQUIRED_RBAC: list[tuple[str, str]] = [
 ]
 
 
-def _import_kubernetes() -> tuple[object | None, object | None, type | None]:
+def _import_kubernetes() -> tuple[Any, Any, Any]:
     """Import the kubernetes client submodules.
 
     Returns ``(client, config, ApiException)`` or ``(None, None, None)`` if
@@ -118,14 +119,14 @@ def _import_kubernetes() -> tuple[object | None, object | None, type | None]:
     """
     try:
         from kubernetes import client as k8s_client  # type: ignore[import-untyped]
-        from kubernetes import config as k8s_config  # type: ignore[import-untyped]
+        from kubernetes import config as k8s_config
         from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
         return k8s_client, k8s_config, ApiException
     except ImportError:
         return None, None, None
 
 
-def _authorize_with(k8s_client: object, kind: str, verb: str) -> bool:
+def _authorize_with(k8s_client: Any, kind: str, verb: str) -> bool:
     """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``."""
     try:
         resource_attrs = k8s_client.V1ResourceAttributes(
@@ -193,7 +194,7 @@ def run_doctor(context: str | None = None) -> DoctorReport:
 
     # ── Check 2: load kubeconfig ──────────────────────────────────────────
     k8s_client, k8s_config, api_exception = _import_kubernetes()
-    if k8s_client is None:
+    if k8s_client is None or k8s_config is None:
         report.checks.append(
             CheckResult(
                 name="kubernetes client",
@@ -203,6 +204,8 @@ def run_doctor(context: str | None = None) -> DoctorReport:
             )
         )
         return report
+    assert k8s_client is not None
+    assert k8s_config is not None
 
     try:
         if context:
@@ -264,6 +267,7 @@ def run_doctor(context: str | None = None) -> DoctorReport:
         return report
 
     # ── Check 4: cluster reachability ─────────────────────────────────────
+    assert api_exception is not None
     try:
         version_api = k8s_client.VersionApi()
         version_info = version_api.get_code()
