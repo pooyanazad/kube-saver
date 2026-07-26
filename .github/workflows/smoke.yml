@@ -121,10 +121,14 @@ jobs:
       - name: Generate report via Docker against kind
         run: |
           mkdir -p smoke-out
+          # Mount kubeconfig to /tmp/kubeconfig (world-accessible) and pass
+          # KUBECONFIG explicitly. This avoids issues with HOME being
+          # reset to / when --user UID overrides the in-image user.
           # Match container UID/GID to host so the mounted output dir is writable.
           docker run --rm \
             --user "$(id -u):$(id -g)" \
-            -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
             -v "$PWD/smoke-out:/out" \
             kube-saver:smoke report -o /out/report.html
 
@@ -142,7 +146,8 @@ jobs:
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
-            -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
+            -e KUBECONFIG=/tmp/kubeconfig \
+            -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
             kube-saver:smoke doctor
 
       - name: Upload smoke artifacts
