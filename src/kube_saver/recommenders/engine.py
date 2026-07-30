@@ -37,7 +37,7 @@ def generate_recommendations(
 
     for ns in report.namespaces:
         # Namespace-level exclusion
-        if config and config.is_namespace_protected(ns.name):
+        if config and config.is_namespace_protected(ns.namespace.name):
             continue
 
         for pod_waste in ns.pod_waste:

@@ -105,9 +105,9 @@ class TestCliFailureMapping:
         # The doctor command does `from kube_saver.doctor import run_doctor` at
         # runtime so we patch the module's attribute in sys.modules.
         import sys
-        import kube_saver.cli as cli_mod
+
         import kube_saver.doctor as doctor_mod
-        from kube_saver.doctor import DoctorReport, CheckResult
+        from kube_saver.doctor import CheckResult, DoctorReport
 
         def _fake_doctor(context: str | None = None):
             return DoctorReport(
@@ -116,7 +116,6 @@ class TestCliFailureMapping:
                 checks=[CheckResult(name="kubeconfig", ok=False)],
             )
 
-        original = doctor_mod.run_doctor
         monkeypatch.setattr(
             sys.modules.get("kube_saver.doctor", doctor_mod),
             "run_doctor",
