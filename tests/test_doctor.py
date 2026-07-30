@@ -231,8 +231,9 @@ class TestRunDoctorSuccess:
         assert "kubeconfig" in names
         assert "context" in names
         assert "cluster reachable" in names
-        for kind, verb in REQUIRED_RBAC:
-            assert f"rbac {verb} {kind}" in names
+        for api_group, kind, verb in REQUIRED_RBAC:
+            display_name = f"{api_group}/{kind}" if api_group else kind
+            assert f"rbac {verb} {display_name}" in names
 
     def test_sar_constructs_resource_attributes(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -260,8 +261,8 @@ class TestRunDoctorSuccess:
         ra_calls = client.V1ResourceAttributes.call_args_list
         kinds_passed = {call.kwargs.get("resource") for call in ra_calls}
         verbs_passed = {call.kwargs.get("verb") for call in ra_calls}
-        assert REQUIRED_RBAC[0][0] in kinds_passed
-        assert REQUIRED_RBAC[0][1] in verbs_passed
+        assert REQUIRED_RBAC[0][1] in kinds_passed
+        assert REQUIRED_RBAC[0][2] in verbs_passed
 
     def test_rbac_denied(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         cfg = tmp_path / "config"

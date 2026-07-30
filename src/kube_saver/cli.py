@@ -18,7 +18,7 @@ from pathlib import Path
 
 import click
 
-from kube_saver import __version__
+from kube_saver import __version__, exitcodes
 from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
 from kube_saver.analyzers.resource_waste import (
     ResourceWasteReport,
@@ -42,8 +42,96 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
     pricing = PricingEngine()
     cost_report = analyze_cost_waste(resource_report, pricing)
-    recs = generate_recommendations(resource_report, pricing)
+    from kube_saver.config import load_config
+    config = load_config()
+    recs = generate_recommendations(resource_report, pricing, config=config)
     return resource_report, cost_report, recs
+
+
+def _safe_run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommendation]]:
+    """Run the analysis pipeline and translate failures into stable exit codes.
+
+    Maps underlying exceptions to documented exit codes so CI and automation
+    can depend on them:
+
+    * FileNotFoundError / kubernetes ConfigException -> CONFIG_ERROR (2)
+    * ConnectionError / OSError / TimeoutError     -> CONNECTION_ERROR (3)
+    * ApiException (HTTP 401/403)                  -> CONNECTION_ERROR (3)
+    * ApiException (any other HTTP)                -> ANALYSIS_ERROR (4)
+    * Any other exception                          -> GENERAL_ERROR (1)
+    """
+    # Resolve exception classes from the kubernetes package lazily so this
+    # module can be imported without it installed.
+    config_exc_cls: type | None = None
+    api_exc_cls: type | None = None
+    try:
+        from kubernetes.client.rest import (  # type: ignore[import-untyped]
+            ApiException as _ApiExc,
+        )
+        from kubernetes.config.config_exception import (  # type: ignore[import-untyped]
+            ConfigException as _ConfigExc,
+        )
+        config_exc_cls = _ConfigExc
+        api_exc_cls = _ApiExc
+    except Exception:
+        pass
+
+    try:
+        return _run_analysis()
+    except SystemExit:
+        raise
+    except FileNotFoundError as exc:
+        click.echo(f"Error: kubeconfig not found — {exc}", err=True)
+        click.echo(
+            "Run `kube-saver doctor` to diagnose, or set KUBECONFIG to a valid file.",
+            err=True,
+        )
+        raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+    except RuntimeError as exc:
+        # Raised by K8sClient.connect() when the kubernetes package is missing.
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+    except BaseException as exc:
+        if config_exc_cls is not None and isinstance(exc, config_exc_cls):
+            click.echo(
+                f"Error: kubeconfig problem — {exc}",
+                err=True,
+            )
+            click.echo(
+                "Check that your kubeconfig exists and the requested context is spelled correctly.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+        if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+            click.echo(
+                f"Error: cannot reach the Kubernetes API — {exc}",
+                err=True,
+            )
+            click.echo(
+                "Run `kube-saver doctor` to check connectivity. "
+                "If running in a container, verify the kubeconfig mount.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONNECTION_ERROR) from exc
+        if api_exc_cls is not None and isinstance(exc, api_exc_cls):
+            status = getattr(exc, "status", None) or "unknown"
+            if status in (401, 403):
+                click.echo(
+                    f"Error: API auth failure (HTTP {status}) — {exc}",
+                    err=True,
+                )
+                click.echo(
+                    "Check RBAC permissions. See: kube-saver doctor",
+                    err=True,
+                )
+                raise SystemExit(exitcodes.CONNECTION_ERROR) from exc
+            click.echo(
+                f"Error: Kubernetes API returned HTTP {status} — {exc}",
+                err=True,
+            )
+            raise SystemExit(exitcodes.ANALYSIS_ERROR) from exc
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(exitcodes.GENERAL_ERROR) from exc
 
 
 # ── Root group ────────────────────────────────────────────────────────────
@@ -83,7 +171,7 @@ def tui() -> None:
 @click.option("-o", "--output", default="kube-saver-report.html", help="Output HTML file path.")
 def report(output: str) -> None:
     """Generate a self-contained HTML executive report."""
-    resource_report, cost_report, recs = _run_analysis()
+    resource_report, cost_report, recs = _safe_run_analysis()
     from kube_saver.exporters.report_generator import generate_html_report
     result = generate_html_report(resource_report, cost_report, recs)
     Path(output).write_text(result.html, encoding="utf-8")
@@ -97,7 +185,7 @@ def report(output: str) -> None:
 @click.option("-d", "--dir", "out_dir", default=".kube-saver", help="Output directory for plan files.")
 def pr_plan(out_dir: str) -> None:
     """Generate local PR plan files (summary, patches, review)."""
-    resource_report, cost_report, recs = _run_analysis()
+    resource_report, cost_report, recs = _safe_run_analysis()
     from kube_saver.exporters.pr_generator import apply_plan_locally, generate_pr_plan
     plan = generate_pr_plan(recs)
     path = apply_plan_locally(plan, output_dir=out_dir)
@@ -116,7 +204,7 @@ def pr_plan(out_dir: str) -> None:
 @click.option("--threshold", default=100.0, help="Monthly USD threshold for spike alerts.")
 def notify(out_dir: str, threshold: float) -> None:
     """Write daily summary + spike alert Markdown files to disk."""
-    resource_report, cost_report, _recs = _run_analysis()
+    resource_report, cost_report, _recs = _safe_run_analysis()
     from kube_saver.exporters.notifier import (
         build_daily_summary,
         build_spike_alert,
@@ -141,19 +229,51 @@ def notify(out_dir: str, threshold: float) -> None:
 @cli.command()
 @click.option("-p", "--port", default=8080, help="Port to listen on.")
 @click.option("-b", "--bind", default="127.0.0.1", help="Address to bind to (default: loopback only).")
-def serve(port: int, bind: str) -> None:
-    """Start the HTTP API server."""
+@click.option("--expose", is_flag=True, default=False, help="Confirm that you want to expose the API on the network.")
+def serve(port: int, bind: str, expose: bool) -> None:
+    """Start the HTTP API server.
+
+    By default the API binds to 127.0.0.1 (loopback only) and is only
+    reachable from the local machine. The API has no authentication, so
+    exposing it on a network interface without a reverse proxy is unsafe.
+    """
     from kube_saver.server import build_server
 
-    if bind not in ("127.0.0.1", "localhost", "::1"):
+    is_loopback = bind in ("127.0.0.1", "localhost", "::1")
+
+    if bind == "0.0.0.0":
+        if not expose:
+            click.echo(
+                "Error: binding to 0.0.0.0 exposes the API on ALL network interfaces.\n"
+                "The kube-saver API has no authentication — do this only behind a reverse proxy.\n\n"
+                "If you understand the risk, use --expose to confirm.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR)
         click.echo(
-            f"WARNING: Binding to {bind} exposes the API on the network. "
-            "kube-saver API has no authentication \u2014 use a reverse proxy for production.",
+            "WARNING: Binding to 0.0.0.0 — the API is reachable from every network interface.\n"
+            "         No authentication is enforced. Use a reverse proxy with TLS and auth.",
             err=True,
         )
+    elif not is_loopback:
+        if not expose:
+            click.echo(
+                f"Error: binding to {bind} exposes the API on the network.\n"
+                "The kube-saver API has no authentication.\n\n"
+                "Use --expose to confirm, or leave the default loopback bind.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR)
+        click.echo(
+            f"WARNING: Binding to {bind} — the API is reachable on this network interface.\n"
+            "         No authentication is enforced. Use a reverse proxy with TLS and auth.",
+            err=True,
+        )
+    else:
+        click.echo(f"API bound to loopback ({bind}) — only local access permitted.")
 
     def _build_report() -> dict[str, object]:
-        rr, cr, recs = _run_analysis()
+        rr, cr, recs = _safe_run_analysis()
         from kube_saver.exporters.json_output import build_json_report
         from kube_saver.models.core import ClusterInfo
         return build_json_report(
@@ -186,7 +306,7 @@ def doctor(context: str | None) -> None:
     report = run_doctor(context=context)
     click.echo(report.render(use_color=use_color))
     if not report.ok:
-        raise SystemExit(1)
+        raise SystemExit(exitcodes.GENERAL_ERROR)
 
 
 # ── Version ───────────────────────────────────────────────────────────────

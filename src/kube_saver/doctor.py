@@ -102,11 +102,19 @@ class DoctorReport:
 
 # Resources + verbs that kube-saver needs to read for its default scan.
 # Kept conservative — kube-saver is read-only.
-REQUIRED_RBAC: list[tuple[str, str]] = [
-    ("pods", "list"),
-    ("pods", "get"),
-    ("namespaces", "list"),
-    ("nodes", "list"),
+REQUIRED_RBAC: list[tuple[str | None, str, str]] = [
+    # (api_group, resource, verb)
+    ("", "pods", "list"),
+    ("", "pods", "get"),
+    ("", "namespaces", "list"),
+    ("", "nodes", "list"),
+    ("apps", "deployments", "list"),
+    ("apps", "deployments", "get"),
+    ("apps", "replicasets", "list"),
+    ("apps", "statefulsets", "list"),
+    ("apps", "daemonsets", "list"),
+    ("metrics.k8s.io", "pods", "list"),
+    ("metrics.k8s.io", "nodes", "list"),
 ]
 
 
@@ -126,12 +134,13 @@ def _import_kubernetes() -> tuple[Any, Any, Any]:
         return None, None, None
 
 
-def _authorize_with(k8s_client: Any, kind: str, verb: str) -> bool:
+def _authorize_with(k8s_client: Any, kind: str, verb: str, api_group: str | None = None) -> bool:
     """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``."""
     try:
         resource_attrs = k8s_client.V1ResourceAttributes(
             resource=kind,
             verb=verb,
+            group=api_group or "",
         )
         spec = k8s_client.V1SelfSubjectAccessReviewSpec(
             resource_attributes=resource_attrs,
@@ -302,11 +311,12 @@ def run_doctor(context: str | None = None) -> DoctorReport:
         return report
 
     # ── Check 5: required RBAC permissions ────────────────────────────────
-    for kind, verb in REQUIRED_RBAC:
-        if _authorize_with(k8s_client, kind, verb):
+    for api_group, kind, verb in REQUIRED_RBAC:
+        display_name = f"{api_group}/{kind}" if api_group else kind
+        if _authorize_with(k8s_client, kind, verb, api_group=api_group or None):
             report.checks.append(
                 CheckResult(
-                    name=f"rbac {verb} {kind}",
+                    name=f"rbac {verb} {display_name}",
                     ok=True,
                     detail="allowed",
                 )
@@ -314,11 +324,11 @@ def run_doctor(context: str | None = None) -> DoctorReport:
         else:
             report.checks.append(
                 CheckResult(
-                    name=f"rbac {verb} {kind}",
+                    name=f"rbac {verb} {display_name}",
                     ok=False,
                     detail="denied",
                     hint=(
-                        f"grant the service account permission to {verb} {kind} "
+                        f"grant the service account permission to {verb} {display_name} "
                         "cluster-wide (e.g. via 'view' ClusterRole)"
                     ),
                 )

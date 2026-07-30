@@ -203,6 +203,8 @@ class PodResourceInfo:
     node_name: str | None = None
     workload_kind: str = "Unknown"
     workload_name: str = ""
+    labels: dict[str, str] = field(default_factory=dict)
+    annotations: dict[str, str] = field(default_factory=dict)
     containers: list[ContainerResourceInfo] = field(default_factory=list)
     resources: ResourceQuantities = field(default_factory=ResourceQuantities)
     actual: ActualUsage = field(default_factory=ActualUsage)

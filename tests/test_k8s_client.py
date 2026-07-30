@@ -1,6 +1,13 @@
-"""Tests for kube-saver K8s client parsing helpers."""
+"""Tests for kube-saver K8s client parsing helpers and connection validation."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
 
 from kube_saver.collectors.k8s_client import (
+    K8sClient,
     _parse_cpu_to_millicores,
     _parse_memory_to_bytes,
 )
@@ -43,3 +50,69 @@ class TestParseMemory:
     def test_empty_returns_zero(self) -> None:
         assert _parse_memory_to_bytes(None) == 0
         assert _parse_memory_to_bytes("") == 0
+
+
+# ── Fast-fail connection tests (B5) ────────────────────────────────────────
+
+
+class TestK8sClientConnect:
+    """Verify that K8sClient.connect() fails fast with clear messages."""
+
+    def test_connect_missing_kubeconfig(self, monkeypatch, tmp_path) -> None:
+        """FileNotFoundError when kubeconfig file does not exist."""
+        from kube_saver.collectors.k8s_client import K8sClient
+
+        monkeypatch.delenv("KUBECONFIG", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        client = K8sClient()
+        with pytest.raises(FileNotFoundError, match="Kubeconfig not found"):
+            client.connect()
+
+    def test_connect_bad_context_fails_fast(self, monkeypatch, tmp_path) -> None:
+        """ConfigException raised immediately when context does not exist."""
+        import sys
+        import types
+        from unittest.mock import MagicMock
+
+        cfg = tmp_path / "config"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+
+        fake_client = MagicMock(name="k8s_client")
+        fake_config = MagicMock(name="k8s_config")
+        fake_config.ConfigException = type("ConfigException", (Exception,), {})
+        fake_config.list_kube_config_contexts.return_value = (
+            [{"name": "dev"}, {"name": "staging"}],
+            {"name": "dev"},
+        )
+
+        fake_pkg = types.ModuleType("kubernetes")
+        fake_pkg.client = fake_client
+        fake_pkg.config = fake_config
+        monkeypatch.setitem(sys.modules, "kubernetes", fake_pkg)
+        monkeypatch.setitem(sys.modules, "kubernetes.client", fake_client)
+        monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config)
+
+        from kube_saver.collectors import k8s_client as kmod
+
+        # Force the module to think kubernetes is available.
+        monkeypatch.setattr(kmod, "_K8S_AVAILABLE", True)
+        monkeypatch.setattr(kmod, "k8s_client", fake_client)
+        monkeypatch.setattr(kmod, "k8s_config", fake_config)
+
+        client = K8sClient(context="production")
+        with pytest.raises(fake_config.ConfigException, match="production"):
+            client.connect()
+
+    def test_resolve_kubeconfig_path_explicit(self, monkeypatch, tmp_path) -> None:
+        cfg = tmp_path / "myconfig"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+        assert K8sClient._resolve_kubeconfig_path() == str(cfg)
+
+    def test_resolve_kubeconfig_path_default(self, monkeypatch, tmp_path) -> None:
+        monkeypatch.delenv("KUBECONFIG", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        expected = str(tmp_path / ".kube" / "config")
+        assert K8sClient._resolve_kubeconfig_path() == expected

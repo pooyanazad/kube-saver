@@ -10,7 +10,9 @@ rather than crashing the entire scan.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from kube_saver.models.core import (
     CloudProvider,
@@ -147,14 +149,43 @@ class K8sClient:
 
         Raises:
             RuntimeError: If the ``kubernetes`` package is not installed.
+            FileNotFoundError: If no kubeconfig file exists.
             kubernetes.config.config_exception.ConfigException:
-                If kubeconfig cannot be loaded.
+                If the kubeconfig cannot be parsed, or the requested context
+                does not exist in the kubeconfig file.
         """
         if not _K8S_AVAILABLE:
             raise RuntimeError(
                 "The 'kubernetes' package is required. "
                 "Install it with: pip install kube-saver"
             )
+
+        # ── Validate kubeconfig file exists ───────────────────────────────
+        kubeconfig_path = self._resolve_kubeconfig_path()
+        if kubeconfig_path and not Path(kubeconfig_path).exists():
+            raise FileNotFoundError(
+                f"Kubeconfig not found at {kubeconfig_path}. "
+                "Set KUBECONFIG or place a config at ~/.kube/config"
+            )
+
+        # ── Validate requested context exists ─────────────────────────────
+        if self.context:
+            try:
+                contexts, current = k8s_config.list_kube_config_contexts(
+                    config_file=kubeconfig_path
+                )
+            except Exception:
+                pass  # ConfigException will be raised by load_kube_config below.
+            else:
+                available = {c["name"] for c in contexts}
+                if self.context not in available:
+                    available_str = ", ".join(sorted(available)) or "(none)"
+                    raise k8s_config.ConfigException(
+                        f"Context '{self.context}' not found in kubeconfig. "
+                        f"Available: {available_str}"
+                    )
+
+        # ── Load config and build clients ─────────────────────────────────
         try:
             k8s_config.load_kube_config(context=self.context or None)
         except k8s_config.ConfigException:
@@ -165,6 +196,14 @@ class K8sClient:
         self._apps_api = k8s_client.AppsV1Api()
         self._connected = True
         logger.info("Kubeconfig loaded successfully")
+
+    @staticmethod
+    def _resolve_kubeconfig_path() -> str | None:
+        """Find the kubeconfig file that would be used."""
+        explicit = os.environ.get("KUBECONFIG")
+        if explicit:
+            return explicit.split(os.pathsep)[0] if explicit else None
+        return str(Path.home() / ".kube" / "config")
 
     @property
     def core(self) -> k8s_client.CoreV1Api:
@@ -301,6 +340,8 @@ class K8sClient:
                     node_name=pod_spec.node_name if pod_spec is not None else None,
                     workload_kind=workload_kind,
                     workload_name=workload_name,
+                    labels=dict(pod.metadata.labels or {}),
+                    annotations=dict(pod.metadata.annotations or {}),
                     containers=container_infos,
                     resources=agg,
                     restart_count=restarts,
