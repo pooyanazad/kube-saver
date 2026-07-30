@@ -1,20 +1,54 @@
 """Recommendation engine for kube-saver.
 
 Phase 2 — Step 11.
+
+Supports namespace-level, label-level, and annotation-level exclusion policies
+to suppress recommendations for protected workloads.
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from kube_saver.analyzers.resource_waste import PodWaste, ResourceWasteReport
 from kube_saver.models.core import Recommendation
 from kube_saver.pricing.engine import PricingEngine
 
+if TYPE_CHECKING:
+    from kube_saver.config import KubeSaverConfig
 
-def generate_recommendations(report: ResourceWasteReport, pricing: PricingEngine) -> list[Recommendation]:
+
+def generate_recommendations(
+    report: ResourceWasteReport,
+    pricing: PricingEngine,
+    config: KubeSaverConfig | None = None,
+) -> list[Recommendation]:
+    """Generate right-sizing recommendations for every pod with waste.
+
+    Args:
+        report: The resource waste analysis result.
+        pricing: The pricing engine for calculating dollar savings.
+        config: Optional application config with exclusion policies.
+
+    Returns:
+        Sorted list of recommendations (highest confidence + savings first).
+    """
     recs: list[Recommendation] = []
 
     for ns in report.namespaces:
+        # Namespace-level exclusion
+        if config and config.is_namespace_protected(ns.name):
+            continue
+
         for pod_waste in ns.pod_waste:
+            # Pod-level exclusion via labels/annotations
+            if config and config.is_pod_excluded(
+                pod_waste.pod.name,
+                pod_labels=pod_waste.pod.labels,
+                pod_annotations=pod_waste.pod.annotations,
+            ):
+                continue
+
             recs.extend(_recommend_for_pod(pod_waste, pricing))
 
     def sort_key(rec: Recommendation) -> tuple[float, int]:
