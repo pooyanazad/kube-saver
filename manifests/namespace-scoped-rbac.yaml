@@ -1,0 +1,48 @@
+# Namespace-scoped RBAC for kube-saver
+#
+# Apply with: kubectl apply -f namespace-scoped-rbac.yaml -n MY-NAMESPACE
+#
+# Replace MY-NAMESPACE with each target namespace.
+# This gives kube-saver read-only access only within the specified namespace.
+#
+# Note: node-level and cluster-wide totals cannot be reported with this scope.
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-saver
+  namespace: MY-NAMESPACE
+  labels:
+    app.kubernetes.io/name: kube-saver
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kube-saver-reader
+  namespace: MY-NAMESPACE
+  labels:
+    app.kubernetes.io/name: kube-saver
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["list", "get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kube-saver-reader
+  namespace: MY-NAMESPACE
+subjects:
+  - kind: ServiceAccount
+    name: kube-saver
+    namespace: MY-NAMESPACE
+roleRef:
+  kind: Role
+  name: kube-saver-reader
+  apiGroup: rbac.authorization.k8s.io
