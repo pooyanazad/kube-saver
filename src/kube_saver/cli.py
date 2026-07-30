@@ -19,6 +19,7 @@ from pathlib import Path
 import click
 
 from kube_saver import __version__
+from kube_saver import exitcodes
 from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
 from kube_saver.analyzers.resource_waste import (
     ResourceWasteReport,
@@ -44,6 +45,90 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     cost_report = analyze_cost_waste(resource_report, pricing)
     recs = generate_recommendations(resource_report, pricing)
     return resource_report, cost_report, recs
+
+
+def _safe_run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommendation]]:
+    """Run the analysis pipeline and translate failures into stable exit codes.
+
+    Maps underlying exceptions to documented exit codes so CI and automation
+    can depend on them:
+
+    * FileNotFoundError / kubernetes ConfigException -> CONFIG_ERROR (2)
+    * ConnectionError / OSError / TimeoutError     -> CONNECTION_ERROR (3)
+    * ApiException (HTTP 401/403)                  -> CONNECTION_ERROR (3)
+    * ApiException (any other HTTP)                -> ANALYSIS_ERROR (4)
+    * Any other exception                          -> GENERAL_ERROR (1)
+    """
+    # Resolve exception classes from the kubernetes package lazily so this
+    # module can be imported without it installed.
+    config_exc_cls: type | None = None
+    api_exc_cls: type | None = None
+    try:
+        from kubernetes.config.config_exception import (  # type: ignore[import-untyped]
+            ConfigException as _ConfigExc,
+        )
+        from kubernetes.client.rest import ApiException as _ApiExc  # type: ignore[import-untyped]
+        config_exc_cls = _ConfigExc
+        api_exc_cls = _ApiExc
+    except Exception:
+        pass
+
+    try:
+        return _run_analysis()
+    except SystemExit:
+        raise
+    except FileNotFoundError as exc:
+        click.echo(f"Error: kubeconfig not found — {exc}", err=True)
+        click.echo(
+            "Run `kube-saver doctor` to diagnose, or set KUBECONFIG to a valid file.",
+            err=True,
+        )
+        raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+    except RuntimeError as exc:
+        # Raised by K8sClient.connect() when the kubernetes package is missing.
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+    except BaseException as exc:
+        if config_exc_cls is not None and isinstance(exc, config_exc_cls):
+            click.echo(
+                f"Error: kubeconfig problem — {exc}",
+                err=True,
+            )
+            click.echo(
+                "Check that your kubeconfig exists and the requested context is spelled correctly.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR) from exc
+        if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+            click.echo(
+                f"Error: cannot reach the Kubernetes API — {exc}",
+                err=True,
+            )
+            click.echo(
+                "Run `kube-saver doctor` to check connectivity. "
+                "If running in a container, verify the kubeconfig mount.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONNECTION_ERROR) from exc
+        if api_exc_cls is not None and isinstance(exc, api_exc_cls):
+            status = getattr(exc, "status", None) or "unknown"
+            if status in (401, 403):
+                click.echo(
+                    f"Error: API auth failure (HTTP {status}) — {exc}",
+                    err=True,
+                )
+                click.echo(
+                    "Check RBAC permissions. See: kube-saver doctor",
+                    err=True,
+                )
+                raise SystemExit(exitcodes.CONNECTION_ERROR) from exc
+            click.echo(
+                f"Error: Kubernetes API returned HTTP {status} — {exc}",
+                err=True,
+            )
+            raise SystemExit(exitcodes.ANALYSIS_ERROR) from exc
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(exitcodes.GENERAL_ERROR) from exc
 
 
 # ── Root group ────────────────────────────────────────────────────────────
@@ -83,7 +168,7 @@ def tui() -> None:
 @click.option("-o", "--output", default="kube-saver-report.html", help="Output HTML file path.")
 def report(output: str) -> None:
     """Generate a self-contained HTML executive report."""
-    resource_report, cost_report, recs = _run_analysis()
+    resource_report, cost_report, recs = _safe_run_analysis()
     from kube_saver.exporters.report_generator import generate_html_report
     result = generate_html_report(resource_report, cost_report, recs)
     Path(output).write_text(result.html, encoding="utf-8")
@@ -97,7 +182,7 @@ def report(output: str) -> None:
 @click.option("-d", "--dir", "out_dir", default=".kube-saver", help="Output directory for plan files.")
 def pr_plan(out_dir: str) -> None:
     """Generate local PR plan files (summary, patches, review)."""
-    resource_report, cost_report, recs = _run_analysis()
+    resource_report, cost_report, recs = _safe_run_analysis()
     from kube_saver.exporters.pr_generator import apply_plan_locally, generate_pr_plan
     plan = generate_pr_plan(recs)
     path = apply_plan_locally(plan, output_dir=out_dir)
@@ -116,7 +201,7 @@ def pr_plan(out_dir: str) -> None:
 @click.option("--threshold", default=100.0, help="Monthly USD threshold for spike alerts.")
 def notify(out_dir: str, threshold: float) -> None:
     """Write daily summary + spike alert Markdown files to disk."""
-    resource_report, cost_report, _recs = _run_analysis()
+    resource_report, cost_report, _recs = _safe_run_analysis()
     from kube_saver.exporters.notifier import (
         build_daily_summary,
         build_spike_alert,
@@ -153,7 +238,7 @@ def serve(port: int, bind: str) -> None:
         )
 
     def _build_report() -> dict[str, object]:
-        rr, cr, recs = _run_analysis()
+        rr, cr, recs = _safe_run_analysis()
         from kube_saver.exporters.json_output import build_json_report
         from kube_saver.models.core import ClusterInfo
         return build_json_report(
@@ -186,7 +271,7 @@ def doctor(context: str | None) -> None:
     report = run_doctor(context=context)
     click.echo(report.render(use_color=use_color))
     if not report.ok:
-        raise SystemExit(1)
+        raise SystemExit(exitcodes.GENERAL_ERROR)
 
 
 # ── Version ───────────────────────────────────────────────────────────────
