@@ -228,16 +228,48 @@ def notify(out_dir: str, threshold: float) -> None:
 @cli.command()
 @click.option("-p", "--port", default=8080, help="Port to listen on.")
 @click.option("-b", "--bind", default="127.0.0.1", help="Address to bind to (default: loopback only).")
-def serve(port: int, bind: str) -> None:
-    """Start the HTTP API server."""
+@click.option("--expose", is_flag=True, default=False, help="Confirm that you want to expose the API on the network.")
+def serve(port: int, bind: str, expose: bool) -> None:
+    """Start the HTTP API server.
+
+    By default the API binds to 127.0.0.1 (loopback only) and is only
+    reachable from the local machine. The API has no authentication, so
+    exposing it on a network interface without a reverse proxy is unsafe.
+    """
     from kube_saver.server import build_server
 
-    if bind not in ("127.0.0.1", "localhost", "::1"):
+    is_loopback = bind in ("127.0.0.1", "localhost", "::1")
+
+    if bind == "0.0.0.0":
+        if not expose:
+            click.echo(
+                "Error: binding to 0.0.0.0 exposes the API on ALL network interfaces.\n"
+                "The kube-saver API has no authentication — do this only behind a reverse proxy.\n\n"
+                "If you understand the risk, use --expose to confirm.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR)
         click.echo(
-            f"WARNING: Binding to {bind} exposes the API on the network. "
-            "kube-saver API has no authentication \u2014 use a reverse proxy for production.",
+            "WARNING: Binding to 0.0.0.0 — the API is reachable from every network interface.\n"
+            "         No authentication is enforced. Use a reverse proxy with TLS and auth.",
             err=True,
         )
+    elif not is_loopback:
+        if not expose:
+            click.echo(
+                f"Error: binding to {bind} exposes the API on the network.\n"
+                "The kube-saver API has no authentication.\n\n"
+                "Use --expose to confirm, or leave the default loopback bind.",
+                err=True,
+            )
+            raise SystemExit(exitcodes.CONFIG_ERROR)
+        click.echo(
+            f"WARNING: Binding to {bind} — the API is reachable on this network interface.\n"
+            "         No authentication is enforced. Use a reverse proxy with TLS and auth.",
+            err=True,
+        )
+    else:
+        click.echo(f"API bound to loopback ({bind}) — only local access permitted.")
 
     def _build_report() -> dict[str, object]:
         rr, cr, recs = _safe_run_analysis()
