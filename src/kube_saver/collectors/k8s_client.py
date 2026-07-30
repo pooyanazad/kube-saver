@@ -340,6 +340,8 @@ class K8sClient:
                     node_name=pod_spec.node_name if pod_spec is not None else None,
                     workload_kind=workload_kind,
                     workload_name=workload_name,
+                    labels=dict(pod.metadata.labels or {}),
+                    annotations=dict(pod.metadata.annotations or {}),
                     containers=container_infos,
                     resources=agg,
                     restart_count=restarts,

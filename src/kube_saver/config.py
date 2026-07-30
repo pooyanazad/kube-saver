@@ -144,6 +144,9 @@ class KubeSaverConfig:
     exclude_namespaces: set[str] = field(default_factory=lambda: {
         "kube-system", "kube-public", "kube-node-lease",
     })
+    exclude_labels: dict[str, str] = field(default_factory=dict)
+    exclude_annotations: dict[str, str] = field(default_factory=dict)
+    protected_namespaces: list[str] = field(default_factory=list)
     kubeconfig_context: str | None = None
     safety: SafetyConfig = field(default_factory=SafetyConfig)
     alerts: AlertConfig = field(default_factory=AlertConfig)
@@ -159,6 +162,26 @@ class KubeSaverConfig:
             self.pricing.cpu_per_core_hour_usd > 0
             or self.pricing.memory_per_gb_hour_usd > 0
         )
+
+    def is_pod_excluded(self, pod_name: str, pod_labels: dict[str, str] | None = None, pod_annotations: dict[str, str] | None = None) -> bool:
+        """Return True if this pod matches any exclusion policy.
+
+        Supports three levels:
+        1. Namespace exclusion via ``exclude_namespaces``
+        2. Label-based exclusion via ``exclude_labels``
+        3. Annotation-based exclusion via ``exclude_annotations``
+        """
+        for label_key, label_val in self.exclude_labels.items():
+            if pod_labels and pod_labels.get(label_key) == label_val:
+                return True
+        for ann_key, ann_val in self.exclude_annotations.items():
+            if pod_annotations and pod_annotations.get(ann_key) == ann_val:
+                return True
+        return False
+
+    def is_namespace_protected(self, namespace: str) -> bool:
+        """Return True if this namespace is in the protected list."""
+        return namespace in self.protected_namespaces
 
 
 # ── Loader ─────────────────────────────────────────────────────────────────
@@ -239,6 +262,9 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         exchange_rate_from_usd=exchange_rate,
         namespace_filter=raw.get("namespace_filter", []),
         exclude_namespaces=set(exclude),
+        exclude_labels=raw.get("exclude_labels", {}),
+        exclude_annotations=raw.get("exclude_annotations", {}),
+        protected_namespaces=raw.get("protected_namespaces", []),
         kubeconfig_context=raw.get("kubeconfig_context"),
         safety=safety,
         alerts=alerts,

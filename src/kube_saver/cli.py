@@ -43,7 +43,9 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
     pricing = PricingEngine()
     cost_report = analyze_cost_waste(resource_report, pricing)
-    recs = generate_recommendations(resource_report, pricing)
+    from kube_saver.config import load_config
+    config = load_config()
+    recs = generate_recommendations(resource_report, pricing, config=config)
     return resource_report, cost_report, recs
 
 
