@@ -18,8 +18,7 @@ from pathlib import Path
 
 import click
 
-from kube_saver import __version__
-from kube_saver import exitcodes
+from kube_saver import __version__, exitcodes
 from kube_saver.analyzers.cost_waste import CostWasteReport, analyze_cost_waste
 from kube_saver.analyzers.resource_waste import (
     ResourceWasteReport,
@@ -66,10 +65,12 @@ def _safe_run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Rec
     config_exc_cls: type | None = None
     api_exc_cls: type | None = None
     try:
+        from kubernetes.client.rest import (  # type: ignore[import-untyped]
+            ApiException as _ApiExc,
+        )
         from kubernetes.config.config_exception import (  # type: ignore[import-untyped]
             ConfigException as _ConfigExc,
         )
-        from kubernetes.client.rest import ApiException as _ApiExc  # type: ignore[import-untyped]
         config_exc_cls = _ConfigExc
         api_exc_cls = _ApiExc
     except Exception:
