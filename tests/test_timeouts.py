@@ -280,8 +280,13 @@ class TestK8sClientTimeouts:
         client = K8sClient(timeouts=TimeoutConfig(connect_seconds=4, read_seconds=11))
         client.connect()
 
-        # connect/read tuple pushed into the urllib3 pool.
-        assert fakes["pool_manager"].connection_pool_kw["timeout"] == (4, 11)
+        # urllib3.Timeout with connect/read pushed into the pool.
+        from urllib3.util.timeout import Timeout as Urllib3Timeout
+
+        pool_timeout = fakes["pool_manager"].connection_pool_kw["timeout"]
+        assert isinstance(pool_timeout, Urllib3Timeout)
+        assert pool_timeout.connect_timeout == 4
+        assert pool_timeout.read_timeout == 11
 
     def test_get_cluster_info_passes_operation_timeout(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

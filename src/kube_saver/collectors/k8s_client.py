@@ -211,14 +211,20 @@ class K8sClient:
         """Push connect/read timeouts into the underlying urllib3 pools.
 
         The official client stores its HTTP transport on ``ApiClient.rest_client``.
-        Each ``PoolManager`` accepts ``timeout`` (connect, read) tuples. We set
-        both the default pool and any per-host pool so retries and redirects
-        inherit the same bounds.
+        ``PoolManager.connection_pool_kw['timeout']`` accepts a
+        ``urllib3.Timeout`` object (connect/read), not a bare tuple. Per-call
+        operation timeouts are handled separately via ``_request_timeout``.
         """
         if not _K8S_AVAILABLE:
             return
-        connect = self.timeouts.connect_seconds
-        read = self.timeouts.read_seconds
+        try:
+            from urllib3.util.timeout import Timeout as Urllib3Timeout
+        except ImportError:
+            return
+        pool_timeout = Urllib3Timeout(
+            connect=self.timeouts.connect_seconds,
+            read=self.timeouts.read_seconds,
+        )
         for api in (self._core_api, self._apps_api):
             if api is None:
                 continue
@@ -229,9 +235,7 @@ class K8sClient:
                 continue
             pool = getattr(rest_client, "pool_manager", None)
             if pool is not None and hasattr(pool, "connection_pool_kw"):
-                pool.connection_pool_kw["timeout"] = (connect, read)
-            # Per-host pools are created lazily by urllib3; nudging the default
-            # connection pool keyword is enough for subsequent requests.
+                pool.connection_pool_kw["timeout"] = pool_timeout
 
     @staticmethod
     def _resolve_kubeconfig_path() -> str | None:
