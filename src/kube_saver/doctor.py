@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from kube_saver.config import TimeoutConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -134,8 +136,20 @@ def _import_kubernetes() -> tuple[Any, Any, Any]:
         return None, None, None
 
 
-def _authorize_with(k8s_client: Any, kind: str, verb: str, api_group: str | None = None) -> bool:
-    """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``."""
+def _authorize_with(
+    k8s_client: Any,
+    kind: str,
+    verb: str,
+    api_group: str | None = None,
+    operation_timeout: float | None = None,
+) -> bool:
+    """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``.
+
+    Args:
+        operation_timeout: Per-call deadline in seconds. If None, the client
+            default is used. Applied via ``_request_timeout`` so a slow or
+            unreachable authorization API cannot hang the whole doctor run.
+    """
     try:
         resource_attrs = k8s_client.V1ResourceAttributes(
             resource=kind,
@@ -147,7 +161,10 @@ def _authorize_with(k8s_client: Any, kind: str, verb: str, api_group: str | None
         )
         review = k8s_client.V1SelfSubjectAccessReview(spec=spec)
         authorization = k8s_client.AuthorizationV1Api()
-        response = authorization.create_self_subject_access_review(review)
+        kwargs: dict[str, Any] = {}
+        if operation_timeout is not None:
+            kwargs["_request_timeout"] = operation_timeout
+        response = authorization.create_self_subject_access_review(review, **kwargs)
         return bool(response.status and response.status.allowed)
     except Exception as exc:  # noqa: BLE001
         logger.warning("SAR for %s/%s failed: %s", kind, verb, exc)
@@ -170,15 +187,26 @@ def _resolve_kubeconfig_path() -> str | None:
     return str(default)
 
 
-def run_doctor(context: str | None = None) -> DoctorReport:
+def run_doctor(
+    context: str | None = None,
+    timeouts: TimeoutConfig | None = None,
+) -> DoctorReport:
     """Execute every doctor check and return a ``DoctorReport``.
 
     The function never raises — every check produces a ``CheckResult`` so the
     caller can render all results even if some fail.
+
+    Args:
+        context: Optional kubeconfig context name to verify.
+        timeouts: Optional ``TimeoutConfig`` applied to every API call so a
+            slow or unreachable API server cannot hang diagnostics. Defaults
+            to the built-in safe values when ``None``.
     """
     report = DoctorReport()
     report.kubeconfig_path = _resolve_kubeconfig_path()
     report.context = context or "default"
+    timeouts = timeouts if timeouts is not None else TimeoutConfig()
+    op_timeout = timeouts.operation_seconds
 
     # ── Check 1: kubeconfig file ──────────────────────────────────────────
     if report.kubeconfig_path and Path(report.kubeconfig_path).exists():
@@ -279,7 +307,7 @@ def run_doctor(context: str | None = None) -> DoctorReport:
     assert api_exception is not None
     try:
         version_api = k8s_client.VersionApi()
-        version_info = version_api.get_code()
+        version_info = version_api.get_code(_request_timeout=op_timeout)
         git_version = getattr(version_info, "git_version", None) or "unknown"
         report.server_version = git_version
         report.checks.append(
@@ -313,7 +341,13 @@ def run_doctor(context: str | None = None) -> DoctorReport:
     # ── Check 5: required RBAC permissions ────────────────────────────────
     for api_group, kind, verb in REQUIRED_RBAC:
         display_name = f"{api_group}/{kind}" if api_group else kind
-        if _authorize_with(k8s_client, kind, verb, api_group=api_group or None):
+        if _authorize_with(
+            k8s_client,
+            kind,
+            verb,
+            api_group=api_group or None,
+            operation_timeout=op_timeout,
+        ):
             report.checks.append(
                 CheckResult(
                     name=f"rbac {verb} {display_name}",

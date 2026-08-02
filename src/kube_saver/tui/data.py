@@ -61,6 +61,7 @@ def load_data(config: KubeSaverConfig) -> TUIData:
         client = K8sClient(
             context=config.kubeconfig_context,
             exclude_namespaces=config.exclude_namespaces,
+            timeouts=config.timeouts,
         )
         client.connect()
     except Exception as exc:

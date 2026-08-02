@@ -14,6 +14,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from kube_saver.config import TimeoutConfig
 from kube_saver.models.core import (
     CloudProvider,
     ClusterInfo,
@@ -132,6 +133,8 @@ class K8sClient:
         context: kubeconfig context to use (None = current default).
         namespace_filter: If set, only return these namespaces.
         exclude_namespaces: Skip namespaces in this set.
+        timeouts: Connect, read, and operation timeouts applied to every
+            API call. Defaults guard against slow or unreachable API servers.
     """
 
     context: str | None = None
@@ -139,6 +142,7 @@ class K8sClient:
     exclude_namespaces: set[str] = field(default_factory=lambda: {
         "kube-system", "kube-public", "kube-node-lease",
     })
+    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
 
     _core_api: object = field(default=None, init=False, repr=False)
     _apps_api: object = field(default=None, init=False, repr=False)
@@ -194,8 +198,40 @@ class K8sClient:
             k8s_config.load_incluster_config()
         self._core_api = k8s_client.CoreV1Api()
         self._apps_api = k8s_client.AppsV1Api()
+        self._apply_timeouts_to_clients()
         self._connected = True
-        logger.info("Kubeconfig loaded successfully")
+        logger.info(
+            "Kubeconfig loaded successfully (timeouts: connect=%.1fs read=%.1fs op=%.1fs)",
+            self.timeouts.connect_seconds,
+            self.timeouts.read_seconds,
+            self.timeouts.operation_seconds,
+        )
+
+    def _apply_timeouts_to_clients(self) -> None:
+        """Push connect/read timeouts into the underlying urllib3 pools.
+
+        The official client stores its HTTP transport on ``ApiClient.rest_client``.
+        Each ``PoolManager`` accepts ``timeout`` (connect, read) tuples. We set
+        both the default pool and any per-host pool so retries and redirects
+        inherit the same bounds.
+        """
+        if not _K8S_AVAILABLE:
+            return
+        connect = self.timeouts.connect_seconds
+        read = self.timeouts.read_seconds
+        for api in (self._core_api, self._apps_api):
+            if api is None:
+                continue
+            rest_client = getattr(api, "rest_client", None) or getattr(
+                getattr(api, "api_client", None), "rest_client", None
+            )
+            if rest_client is None:
+                continue
+            pool = getattr(rest_client, "pool_manager", None)
+            if pool is not None and hasattr(pool, "connection_pool_kw"):
+                pool.connection_pool_kw["timeout"] = (connect, read)
+            # Per-host pools are created lazily by urllib3; nudging the default
+            # connection pool keyword is enough for subsequent requests.
 
     @staticmethod
     def _resolve_kubeconfig_path() -> str | None:
@@ -225,16 +261,17 @@ class K8sClient:
         Returns a ``ClusterInfo`` with the sum of allocatable CPU and memory
         across all worker nodes.
         """
+        op_timeout = self.timeouts.operation_seconds
         version = "unknown"
         try:
             version_api = k8s_client.VersionApi()
-            version_info = version_api.get_code()
+            version_info = version_api.get_code(_request_timeout=op_timeout)
             version = getattr(version_info, "git_version", None) or "unknown"
         except Exception:
             version = "unknown"
 
         try:
-            nodes = self.core.list_node().items
+            nodes = self.core.list_node(_request_timeout=op_timeout).items
         except ApiException as exc:
             logger.warning("Cannot list nodes (RBAC?): %s", exc)
             nodes = []
@@ -263,7 +300,9 @@ class K8sClient:
         Respects ``namespace_filter`` and ``exclude_namespaces``.
         """
         try:
-            ns_list = self.core.list_namespace().items
+            ns_list = self.core.list_namespace(
+                _request_timeout=self.timeouts.operation_seconds
+            ).items
         except ApiException as exc:
             logger.warning("Cannot list namespaces (RBAC?): %s", exc)
             return []
@@ -287,7 +326,9 @@ class K8sClient:
         """Count running pods in a namespace."""
         try:
             pods = self.core.list_namespaced_pod(
-                namespace, field_selector="status.phase=Running"
+                namespace,
+                field_selector="status.phase=Running",
+                _request_timeout=self.timeouts.operation_seconds,
             )
             return len(pods.items)
         except ApiException as exc:
@@ -301,7 +342,10 @@ class K8sClient:
         resource requests/limits from the pod spec.
         """
         try:
-            pods = self.core.list_namespaced_pod(namespace).items
+            pods = self.core.list_namespaced_pod(
+                namespace,
+                _request_timeout=self.timeouts.operation_seconds,
+            ).items
         except ApiException as exc:
             logger.warning("Cannot list pods in %s: %s", namespace, exc)
             return []
@@ -360,7 +404,9 @@ class K8sClient:
         """Map node name to list of pod names running on it."""
         node_pods: dict[str, list[str]] = {}
         try:
-            pods = self.core.list_pod_for_all_namespaces().items
+            pods = self.core.list_pod_for_all_namespaces(
+                _request_timeout=self.timeouts.operation_seconds
+            ).items
         except ApiException as exc:
             logger.warning("Cannot list pods cluster-wide: %s", exc)
             return {}
