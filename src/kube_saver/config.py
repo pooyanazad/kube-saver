@@ -112,6 +112,49 @@ class TUIConfig:
 
 
 @dataclass
+class TimeoutConfig:
+    """Configurable timeouts for Kubernetes API calls.
+
+    These guard kube-saver against slow or unreachable API servers so a
+    single hung request cannot block a whole scan. Defaults are generous
+    enough for managed control planes (EKS/GKE/AKS) under normal load.
+
+    Attributes:
+        connect_seconds: Max seconds to wait when establishing the TCP
+            connection to the API server. Must be > 0.
+        read_seconds: Max seconds to wait for a response after the request
+            has been sent. Must be > 0.
+        operation_seconds: Per-call deadline applied to list/get requests
+            that accept a ``_request_timeout`` argument. Must be > 0.
+    """
+
+    connect_seconds: float = 10.0
+    read_seconds: float = 30.0
+    operation_seconds: float = 60.0
+
+    def normalized(self) -> TimeoutConfig:
+        """Return a copy with all values clamped to safe positive bounds.
+
+        Zero, negative, or non-finite values are replaced with the defaults
+        so a misconfigured file or env var can never disable timeouts.
+        """
+        def _clamp(value: float, default: float) -> float:
+            try:
+                v = float(value)
+            except (TypeError, ValueError):
+                return default
+            if v != v or v in (float("inf"), float("-inf")) or v <= 0:
+                return default
+            return v
+
+        return TimeoutConfig(
+            connect_seconds=_clamp(self.connect_seconds, 10.0),
+            read_seconds=_clamp(self.read_seconds, 30.0),
+            operation_seconds=_clamp(self.operation_seconds, 60.0),
+        )
+
+
+@dataclass
 class ExportConfig:
     """Export-related settings.
 
@@ -153,6 +196,7 @@ class KubeSaverConfig:
     pricing: PricingOverrides = field(default_factory=PricingOverrides)
     tui: TUIConfig = field(default_factory=TUIConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
+    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
 
     # ── helpers ────────────────────────────────────────────────────────────
 
@@ -255,6 +299,13 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         git_author_email=export_raw.get("git_author_email", "kube-saver@localhost"),
     )
 
+    timeouts_raw = raw.get("timeouts", {})
+    timeouts = TimeoutConfig(
+        connect_seconds=timeouts_raw.get("connect_seconds", 10.0),
+        read_seconds=timeouts_raw.get("read_seconds", 30.0),
+        operation_seconds=timeouts_raw.get("operation_seconds", 60.0),
+    ).normalized()
+
     return KubeSaverConfig(
         cloud_provider=provider,
         provider_tier=raw.get("provider_tier", "general"),
@@ -271,6 +322,7 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         pricing=pricing,
         tui=tui,
         export=export,
+        timeouts=timeouts,
     )
 
 
@@ -278,13 +330,16 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
     """Override config values from environment variables.
 
     Recognised variables (all prefixed ``KUBE_SAVER_``):
-        KUBE_SAVER_PROVIDER        - cloud_provider
-        KUBE_SAVER_TIER            - provider_tier
-        KUBE_SAVER_CONTEXT         - kubeconfig_context
-        KUBE_SAVER_AGGRESSIVE_MODE - safety.aggressive_mode (true/1/yes)
-        KUBE_SAVER_CPU_PER_CORE    - pricing.cpu_per_core_hour_usd
-        KUBE_SAVER_MEM_PER_GB      - pricing.memory_per_gb_hour_usd
-        KUBE_SAVER_REFRESH_SECS    - tui.refresh_interval_seconds
+        KUBE_SAVER_PROVIDER         - cloud_provider
+        KUBE_SAVER_TIER             - provider_tier
+        KUBE_SAVER_CONTEXT          - kubeconfig_context
+        KUBE_SAVER_AGGRESSIVE_MODE  - safety.aggressive_mode (true/1/yes)
+        KUBE_SAVER_CPU_PER_CORE     - pricing.cpu_per_core_hour_usd
+        KUBE_SAVER_MEM_PER_GB       - pricing.memory_per_gb_hour_usd
+        KUBE_SAVER_REFRESH_SECS     - tui.refresh_interval_seconds
+        KUBE_SAVER_TIMEOUT_CONNECT  - timeouts.connect_seconds
+        KUBE_SAVER_TIMEOUT_READ     - timeouts.read_seconds
+        KUBE_SAVER_TIMEOUT_OPERATION - timeouts.operation_seconds
     """
     env = os.environ
 
@@ -311,6 +366,19 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         cfg.pricing.memory_per_gb_hour_usd = float(v)
     if (v := _env("REFRESH_SECS")) is not None:
         cfg.tui.refresh_interval_seconds = int(v)
+    if (v := _env("TIMEOUT_CONNECT")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.timeouts.connect_seconds = float(v)
+    if (v := _env("TIMEOUT_READ")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.timeouts.read_seconds = float(v)
+    if (v := _env("TIMEOUT_OPERATION")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.timeouts.operation_seconds = float(v)
+
+    # Re-normalize after env overrides so invalid values can never disable
+    # timeouts entirely.
+    cfg.timeouts = cfg.timeouts.normalized()
 
     return cfg
 
@@ -405,6 +473,11 @@ def default_config_yaml() -> str:
             "git_author_name": default.export.git_author_name,
             "git_author_email": default.export.git_author_email,
         },
+        "timeouts": {
+            "connect_seconds": default.timeouts.connect_seconds,
+            "read_seconds": default.timeouts.read_seconds,
+            "operation_seconds": default.timeouts.operation_seconds,
+        },
     }
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
@@ -415,6 +488,7 @@ __all__ = [
     "AlertConfig",
     "PricingOverrides",
     "TUIConfig",
+    "TimeoutConfig",
     "ExportConfig",
     "load_config",
     "default_config_yaml",

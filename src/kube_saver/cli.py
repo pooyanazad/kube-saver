@@ -34,7 +34,9 @@ from kube_saver.recommenders.engine import generate_recommendations
 
 def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommendation]]:
     """Run the full analysis pipeline."""
-    client = K8sClient()
+    from kube_saver.config import load_config
+    config = load_config()
+    client = K8sClient(timeouts=config.timeouts)
     client.connect()
     pods = client.get_all_pods()
     namespaces = client.get_namespaces()
@@ -42,8 +44,6 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
     pricing = PricingEngine()
     cost_report = analyze_cost_waste(resource_report, pricing)
-    from kube_saver.config import load_config
-    config = load_config()
     recs = generate_recommendations(resource_report, pricing, config=config)
     return resource_report, cost_report, recs
 
@@ -300,10 +300,12 @@ def serve(port: int, bind: str, expose: bool) -> None:
 @click.option("-c", "--context", default=None, help="Kubeconfig context to check (default: current).")
 def doctor(context: str | None) -> None:
     """Check kubeconfig, context, cluster connectivity, and required permissions."""
+    from kube_saver.config import load_config
     from kube_saver.doctor import run_doctor
 
+    config = load_config()
     use_color = sys.stdout.isatty()
-    report = run_doctor(context=context)
+    report = run_doctor(context=context, timeouts=config.timeouts)
     click.echo(report.render(use_color=use_color))
     if not report.ok:
         raise SystemExit(exitcodes.GENERAL_ERROR)
