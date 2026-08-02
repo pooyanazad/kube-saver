@@ -133,6 +133,49 @@ The server defaults to loopback. Do **not** change `host` to `0.0.0.0` unless yo
 
 ---
 
+## Kubernetes API timeouts
+
+kube-saver applies bounded timeouts to every Kubernetes API call so a slow or unreachable control plane cannot block a scan indefinitely. Three knobs are available; all are optional and have safe defaults.
+
+```yaml
+timeouts:
+  connect_seconds: 10       # TCP connect deadline per request
+  read_seconds: 30          # read deadline per request
+  operation_seconds: 60     # per-call list/get deadline
+```
+
+### Safe defaults and rationale
+
+| Key | Default | Why this value |
+|---|---|---|
+| `connect_seconds` | `10` | Long enough for a cold TLS handshake to a managed control plane (EKS/GKE/AKS) over a typical corporate link, short enough to fail fast on a dead endpoint. |
+| `read_seconds` | `30` | Covers large namespace listings on busy clusters while still bounding hung responses. |
+| `operation_seconds` | `60` | Upper bound for a single list/get call. Large clusters with thousands of pods normally return well under this. |
+
+Invalid values (zero, negative, non-numeric, `NaN`, `inf`) are silently replaced with the defaults — kube-saver never runs with timeouts disabled.
+
+### Environment overrides
+
+```bash
+export KUBE_SAVER_TIMEOUT_CONNECT=5
+export KUBE_SAVER_TIMEOUT_READ=20
+export KUBE_SAVER_TIMEOUT_OPERATION=45
+```
+
+Environment variables override config-file values; CLI flags are not provided because timeouts are rarely changed per-invocation. Lower these values for tight CI budgets; raise them only if a large, slow cluster is producing spurious timeouts.
+
+### Where timeouts apply
+
+Timeouts are applied consistently across:
+
+- `K8sClient` collectors (cluster info, namespaces, pods, node→pod maps)
+- `kube-saver doctor` (version check and RBAC self-subject access reviews)
+- the HTTP API server and TUI, which both use the same `K8sClient` path
+
+If a call times out, kube-saver treats it like any other API failure: it logs a warning, skips the affected resource, and continues the scan rather than hanging or crashing.
+
+---
+
 ## Environment variables
 
 Every config key has a runtime environment variable override. Environment variables take precedence over config file values.
@@ -147,6 +190,9 @@ Every config key has a runtime environment variable override. Environment variab
 | `KUBE_SAVER_CLOUD_PROVIDER` | `cloud_provider` | `aws` |
 | `KUBE_SAVER_PROVIDER_TIER` | `provider_tier` | `spot` |
 | `KUBE_SAVER_LOG_LEVEL` | (global) | `debug` |
+| `KUBE_SAVER_TIMEOUT_CONNECT` | `timeouts.connect_seconds` | `5` |
+| `KUBE_SAVER_TIMEOUT_READ` | `timeouts.read_seconds` | `20` |
+| `KUBE_SAVER_TIMEOUT_OPERATION` | `timeouts.operation_seconds` | `45` |
 | `KUBECONFIG` | `--kubeconfig` flag | `~/.kube/config` |
 
 ---
