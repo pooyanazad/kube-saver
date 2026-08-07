@@ -2,47 +2,124 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
+import sys
+import traceback
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from kube_saver.version import VERSION
 
+logger = logging.getLogger(__name__)
+
+# Static server banner. Never reveal the Python/BaseHTTP version.
+_SERVER_BANNER = "kube-saver"
+
+# Security headers applied to every response. HSTS is intentionally not set
+# because the server is loopback-only by design and is expected to sit behind
+# a TLS-terminating reverse proxy when exposed.
+_SECURITY_HEADERS: dict[str, str] = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json",
+}
+
+# Methods this server actually understands. Sent in the Allow header on 405.
+_ALLOWED_METHODS = "GET, HEAD, OPTIONS"
+
 
 class _Handler(BaseHTTPRequestHandler):
+    # Override BaseHTTPRequestHandler's "BaseHTTP/0.6 Python/x.y" banner so
+    # service fingerprinting (e.g. nmap -sV) cannot read the runtime version.
+    server_version = _SERVER_BANNER
+    sys_version = ""
+
+    def version_string(self) -> str:  # noqa: D401
+        return _SERVER_BANNER
+
     def do_GET(self) -> None:  # noqa: N802
         if self.path in {"/healthz", "/readyz"}:
             self._send_json(200, {"status": "ok"})
             return
         if self.path == "/api/v1/report":
-            report_builder = getattr(self.server, "report_builder", None)
-            payload = report_builder() if report_builder else {"error": "no report builder"}
-            self._send_json(200, payload)
+            self._handle_report()
             return
         if self.path in {"/openapi.json", "/swagger.json"}:
             self._send_json(200, _openapi_stub())
             return
         self._send_json(404, {"error": "not found"})
 
+    def do_HEAD(self) -> None:  # noqa: N802
+        if self.path in {"/healthz", "/readyz", "/api/v1/report", "/openapi.json", "/swagger.json"}:
+            self._send_json(200, None)
+            return
+        self._send_json(404, None)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self._send_json(200, {"status": "ok"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
     def do_POST(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def do_PUT(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def do_DELETE(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
+    def do_TRACE(self) -> None:  # noqa: N802
+        # TRACE must never echo the request back (XST).
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
 
-    def _send_json(self, status: int, payload: dict[str, object]) -> None:
-        body = json.dumps(payload).encode("utf-8")
+    def _handle_report(self) -> None:
+        """Run the report builder, translating failures into a stable JSON 503.
+
+        Catches ``SystemExit`` too because ``_safe_run_analysis`` raises it for
+        kubeconfig/cluster failures. Without this wrapper the exception
+        escaped into ``HTTPServer`` and reset the connection.
+        """
+        report_builder = getattr(self.server, "report_builder", None)
+        if report_builder is None:
+            self._send_json(503, {"error": "report builder not configured"})
+            return
+        try:
+            payload = report_builder()
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            logger.error("report builder failed: %s", exc)
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(file=sys.stderr)
+            self._send_json(503, {"error": "report unavailable"})
+            return
+        self._send_json(200, payload)
+
+    def _send_json(
+        self,
+        status: int,
+        payload: dict[str, object] | None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        body = b"" if payload is None else json.dumps(payload).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        for name, value in _SECURITY_HEADERS.items():
+            self.send_header(name, value)
+        if extra_headers:
+            for name, value in extra_headers.items():
+                self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD" and body:
+            with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                self.wfile.write(body)
 
 
 def build_server(
