@@ -1,4 +1,6 @@
 import json
+from http.client import HTTPConnection
+from threading import Thread
 from urllib.request import urlopen
 
 from kube_saver.analyzers.cost_waste import CostWasteReport
@@ -37,5 +39,28 @@ def test_server_mode_endpoints() -> None:
         thread.start()
         health = json.loads(urlopen(f"http://{host}:{port}/healthz", timeout=2).read().decode())
         assert health["status"] == "ok"
+    finally:
+        server.server_close()
+
+
+def _serve_once(server) -> None:
+    """Handle exactly one request in a background thread."""
+    Thread(target=server.handle_request, daemon=True).start()
+
+
+def test_server_static_banner_no_version_leak() -> None:
+    """Server header must not leak BaseHTTP/Python versions."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.getheader("Server") == "kube-saver"
+        assert "Python" not in (resp.getheader("Server") or "")
+        assert "BaseHTTP" not in (resp.getheader("Server") or "")
+        conn.close()
     finally:
         server.server_close()
