@@ -1,4 +1,6 @@
 import json
+from http.client import HTTPConnection
+from threading import Thread
 from urllib.request import urlopen
 
 from kube_saver.analyzers.cost_waste import CostWasteReport
@@ -37,5 +39,162 @@ def test_server_mode_endpoints() -> None:
         thread.start()
         health = json.loads(urlopen(f"http://{host}:{port}/healthz", timeout=2).read().decode())
         assert health["status"] == "ok"
+    finally:
+        server.server_close()
+
+
+def _serve_once(server) -> None:
+    """Handle exactly one request in a background thread."""
+    Thread(target=server.handle_request, daemon=True).start()
+
+
+def test_server_static_banner_no_version_leak() -> None:
+    """Server header must not leak BaseHTTP/Python versions."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.getheader("Server") == "kube-saver"
+        assert "Python" not in (resp.getheader("Server") or "")
+        assert "BaseHTTP" not in (resp.getheader("Server") or "")
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_security_headers_present() -> None:
+    """Security headers must be sent on every response."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.getheader("X-Content-Type-Options") == "nosniff"
+        assert resp.getheader("X-Frame-Options") == "DENY"
+        assert resp.getheader("Referrer-Policy") == "no-referrer"
+        assert resp.getheader("Cache-Control") == "no-store"
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_head_returns_no_body_and_200() -> None:
+    """HEAD must return 200 (not 501) with an empty body."""
+    server = build_server(lambda: {"x": 1}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("HEAD", "/healthz")
+        resp = conn.getresponse()
+        body = resp.read()
+        assert resp.status == 200
+        assert body == b""
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_options_returns_allow_and_200() -> None:
+    """OPTIONS must return 200 with an Allow header (not 501)."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("OPTIONS", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 200
+        allow = resp.getheader("Allow") or ""
+        assert "GET" in allow and "HEAD" in allow and "OPTIONS" in allow
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_unknown_methods_return_405() -> None:
+    """POST/PUT/DELETE/PATCH/TRACE must return 405, not 501."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        for method in ("POST", "PUT", "DELETE", "PATCH", "TRACE"):
+            _serve_once(server)
+            conn = HTTPConnection(host, port, timeout=2)
+            conn.request(method, "/healthz")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 405, f"{method} should be 405, got {resp.status}"
+            assert "GET" in (resp.getheader("Allow") or "")
+            conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_trace_does_not_echo_request() -> None:
+    """TRACE must never echo the request body back (cross-site tracing)."""
+    import socket
+
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        sock = socket.create_connection((host, port), timeout=2)
+        try:
+            sock.sendall(b"TRACE /healthz HTTP/1.1\r\nHost: x\r\nSecret: hunter2\r\n\r\n")
+            data = sock.recv(4096)
+            assert b"hunter2" not in data
+            assert b"405" in data
+        finally:
+            sock.close()
+    finally:
+        server.server_close()
+
+
+def test_server_report_failure_returns_stable_503() -> None:
+    """A throwing report builder must surface as JSON 503, not a socket reset."""
+    def boom() -> dict[str, object]:
+        raise RuntimeError("cluster unreachable")
+
+    server = build_server(boom, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/api/v1/report")
+        resp = conn.getresponse()
+        body = resp.read().decode()
+        assert resp.status == 503
+        # The internal exception text must NOT leak to the client.
+        assert "cluster unreachable" not in body
+        assert "error" in body
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_report_systemexit_returns_stable_503() -> None:
+    """``_safe_run_analysis`` raises SystemExit; server must catch it too."""
+    def boom() -> dict[str, object]:
+        raise SystemExit(2)
+
+    server = build_server(boom, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/api/v1/report")
+        resp = conn.getresponse()
+        body = resp.read().decode()
+        assert resp.status == 503
+        assert "error" in body
+        conn.close()
     finally:
         server.server_close()
