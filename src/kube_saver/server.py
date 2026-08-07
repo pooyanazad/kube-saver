@@ -8,8 +8,19 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from kube_saver.version import VERSION
 
+# Static server banner. Never reveal the Python/BaseHTTP version.
+_SERVER_BANNER = "kube-saver"
+
 
 class _Handler(BaseHTTPRequestHandler):
+    # Override BaseHTTPRequestHandler's "BaseHTTP/0.6 Python/x.y" banner so
+    # service fingerprinting (e.g. nmap -sV) cannot read the runtime version.
+    server_version = _SERVER_BANNER
+    sys_version = ""
+
+    def version_string(self) -> str:  # noqa: D401
+        return _SERVER_BANNER
+
     def do_GET(self) -> None:  # noqa: N802
         if self.path in {"/healthz", "/readyz"}:
             self._send_json(200, {"status": "ok"})
