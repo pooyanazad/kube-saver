@@ -118,3 +118,41 @@ def test_server_options_returns_allow_and_200() -> None:
         conn.close()
     finally:
         server.server_close()
+
+
+def test_server_unknown_methods_return_405() -> None:
+    """POST/PUT/DELETE/PATCH/TRACE must return 405, not 501."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        for method in ("POST", "PUT", "DELETE", "PATCH", "TRACE"):
+            _serve_once(server)
+            conn = HTTPConnection(host, port, timeout=2)
+            conn.request(method, "/healthz")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 405, f"{method} should be 405, got {resp.status}"
+            assert "GET" in (resp.getheader("Allow") or "")
+            conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_trace_does_not_echo_request() -> None:
+    """TRACE must never echo the request body back (cross-site tracing)."""
+    import socket
+
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        sock = socket.create_connection((host, port), timeout=2)
+        try:
+            sock.sendall(b"TRACE /healthz HTTP/1.1\r\nHost: x\r\nSecret: hunter2\r\n\r\n")
+            data = sock.recv(4096)
+            assert b"hunter2" not in data
+            assert b"405" in data
+        finally:
+            sock.close()
+    finally:
+        server.server_close()
