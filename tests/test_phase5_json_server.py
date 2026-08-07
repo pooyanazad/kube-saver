@@ -83,3 +83,38 @@ def test_server_security_headers_present() -> None:
         conn.close()
     finally:
         server.server_close()
+
+
+def test_server_head_returns_no_body_and_200() -> None:
+    """HEAD must return 200 (not 501) with an empty body."""
+    server = build_server(lambda: {"x": 1}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("HEAD", "/healthz")
+        resp = conn.getresponse()
+        body = resp.read()
+        assert resp.status == 200
+        assert body == b""
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_options_returns_allow_and_200() -> None:
+    """OPTIONS must return 200 with an Allow header (not 501)."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("OPTIONS", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 200
+        allow = resp.getheader("Allow") or ""
+        assert "GET" in allow and "HEAD" in allow and "OPTIONS" in allow
+        conn.close()
+    finally:
+        server.server_close()
