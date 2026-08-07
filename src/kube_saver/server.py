@@ -59,13 +59,20 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "ok"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def do_POST(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def do_PUT(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def do_DELETE(self) -> None:  # noqa: N802
-        self._send_json(405, {"error": "method not allowed"})
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
+    def do_TRACE(self) -> None:  # noqa: N802
+        # TRACE must never echo the request back (XST).
+        self._send_json(405, {"error": "method not allowed"}, extra_headers={"Allow": _ALLOWED_METHODS})
 
     def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
