@@ -64,3 +64,22 @@ def test_server_static_banner_no_version_leak() -> None:
         conn.close()
     finally:
         server.server_close()
+
+
+def test_server_security_headers_present() -> None:
+    """Security headers must be sent on every response."""
+    server = build_server(lambda: {}, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/healthz")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.getheader("X-Content-Type-Options") == "nosniff"
+        assert resp.getheader("X-Frame-Options") == "DENY"
+        assert resp.getheader("Referrer-Policy") == "no-referrer"
+        assert resp.getheader("Cache-Control") == "no-store"
+        conn.close()
+    finally:
+        server.server_close()
