@@ -11,6 +11,17 @@ from kube_saver.version import VERSION
 # Static server banner. Never reveal the Python/BaseHTTP version.
 _SERVER_BANNER = "kube-saver"
 
+# Security headers applied to every response. HSTS is intentionally not set
+# because the server is loopback-only by design and is expected to sit behind
+# a TLS-terminating reverse proxy when exposed.
+_SECURITY_HEADERS: dict[str, str] = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json",
+}
+
 
 class _Handler(BaseHTTPRequestHandler):
     # Override BaseHTTPRequestHandler's "BaseHTTP/0.6 Python/x.y" banner so
@@ -50,7 +61,8 @@ class _Handler(BaseHTTPRequestHandler):
     def _send_json(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        for name, value in _SECURITY_HEADERS.items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
