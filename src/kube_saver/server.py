@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
+import sys
+import traceback
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from kube_saver.version import VERSION
+
+logger = logging.getLogger(__name__)
 
 # Static server banner. Never reveal the Python/BaseHTTP version.
 _SERVER_BANNER = "kube-saver"
@@ -40,9 +46,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"status": "ok"})
             return
         if self.path == "/api/v1/report":
-            report_builder = getattr(self.server, "report_builder", None)
-            payload = report_builder() if report_builder else {"error": "no report builder"}
-            self._send_json(200, payload)
+            self._handle_report()
             return
         if self.path in {"/openapi.json", "/swagger.json"}:
             self._send_json(200, _openapi_stub())
@@ -77,6 +81,27 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
 
+    def _handle_report(self) -> None:
+        """Run the report builder, translating failures into a stable JSON 503.
+
+        Catches ``SystemExit`` too because ``_safe_run_analysis`` raises it for
+        kubeconfig/cluster failures. Without this wrapper the exception
+        escaped into ``HTTPServer`` and reset the connection.
+        """
+        report_builder = getattr(self.server, "report_builder", None)
+        if report_builder is None:
+            self._send_json(503, {"error": "report builder not configured"})
+            return
+        try:
+            payload = report_builder()
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            logger.error("report builder failed: %s", exc)
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(file=sys.stderr)
+            self._send_json(503, {"error": "report unavailable"})
+            return
+        self._send_json(200, payload)
+
     def _send_json(
         self,
         status: int,
@@ -93,7 +118,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command != "HEAD" and body:
-            self.wfile.write(body)
+            with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                self.wfile.write(body)
 
 
 def build_server(

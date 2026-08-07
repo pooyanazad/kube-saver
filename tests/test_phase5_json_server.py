@@ -156,3 +156,45 @@ def test_server_trace_does_not_echo_request() -> None:
             sock.close()
     finally:
         server.server_close()
+
+
+def test_server_report_failure_returns_stable_503() -> None:
+    """A throwing report builder must surface as JSON 503, not a socket reset."""
+    def boom() -> dict[str, object]:
+        raise RuntimeError("cluster unreachable")
+
+    server = build_server(boom, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/api/v1/report")
+        resp = conn.getresponse()
+        body = resp.read().decode()
+        assert resp.status == 503
+        # The internal exception text must NOT leak to the client.
+        assert "cluster unreachable" not in body
+        assert "error" in body
+        conn.close()
+    finally:
+        server.server_close()
+
+
+def test_server_report_systemexit_returns_stable_503() -> None:
+    """``_safe_run_analysis`` raises SystemExit; server must catch it too."""
+    def boom() -> dict[str, object]:
+        raise SystemExit(2)
+
+    server = build_server(boom, port=0)
+    try:
+        host, port = server.server_address
+        _serve_once(server)
+        conn = HTTPConnection(host, port, timeout=2)
+        conn.request("GET", "/api/v1/report")
+        resp = conn.getresponse()
+        body = resp.read().decode()
+        assert resp.status == 503
+        assert "error" in body
+        conn.close()
+    finally:
+        server.server_close()
