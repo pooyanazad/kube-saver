@@ -22,6 +22,9 @@ _SECURITY_HEADERS: dict[str, str] = {
     "Content-Type": "application/json",
 }
 
+# Methods this server actually understands. Sent in the Allow header on 405.
+_ALLOWED_METHODS = "GET, HEAD, OPTIONS"
+
 
 class _Handler(BaseHTTPRequestHandler):
     # Override BaseHTTPRequestHandler's "BaseHTTP/0.6 Python/x.y" banner so
@@ -46,6 +49,15 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not found"})
 
+    def do_HEAD(self) -> None:  # noqa: N802
+        if self.path in {"/healthz", "/readyz", "/api/v1/report", "/openapi.json", "/swagger.json"}:
+            self._send_json(200, None)
+            return
+        self._send_json(404, None)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self._send_json(200, {"status": "ok"}, extra_headers={"Allow": _ALLOWED_METHODS})
+
     def do_POST(self) -> None:  # noqa: N802
         self._send_json(405, {"error": "method not allowed"})
 
@@ -58,14 +70,23 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, log_format: str, *args: object) -> None:  # noqa: A003
         return
 
-    def _send_json(self, status: int, payload: dict[str, object]) -> None:
-        body = json.dumps(payload).encode("utf-8")
+    def _send_json(
+        self,
+        status: int,
+        payload: dict[str, object] | None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        body = b"" if payload is None else json.dumps(payload).encode("utf-8")
         self.send_response(status)
         for name, value in _SECURITY_HEADERS.items():
             self.send_header(name, value)
+        if extra_headers:
+            for name, value in extra_headers.items():
+                self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD" and body:
+            self.wfile.write(body)
 
 
 def build_server(
