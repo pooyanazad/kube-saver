@@ -185,18 +185,28 @@ class RetryConfig:
 
         Non-positive or non-integer values are replaced with the defaults so
         a misconfigured file or env var can never disable retries entirely
-        nor produce absurd backoff durations.
+        nor produce absurd backoff durations. ``max_attempts`` is additionally
+        clamped to a floor of 1 so a stray zero never means "no calls".
         """
-        def _clamp_int(value: Any, default: int, minimum: int) -> int:
+        def _clamp_attempts(value: Any, default: int) -> int:
             try:
                 v = int(value)
             except (TypeError, ValueError):
                 return default
-            return max(v, minimum)
+            return max(v, 1)
 
-        attempts = _clamp_int(self.max_attempts, 3, 1)
-        initial = _clamp_int(self.initial_backoff_ms, 200, 1)
-        cap = _clamp_int(self.max_backoff_ms, 5_000, 1)
+        def _positive_int(value: Any, default: int) -> int:
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                return default
+            if v <= 0:
+                return default
+            return v
+
+        attempts = _clamp_attempts(self.max_attempts, 3)
+        initial = _positive_int(self.initial_backoff_ms, 200)
+        cap = _positive_int(self.max_backoff_ms, 5_000)
         if initial > cap:
             initial = cap
         codes = self.retryable_status_codes
@@ -365,6 +375,22 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         operation_seconds=timeouts_raw.get("operation_seconds", 60.0),
     ).normalized()
 
+    retries_raw = raw.get("retries", {})
+    retry_codes_raw = retries_raw.get("retryable_status_codes")
+    if retry_codes_raw is None:
+        retry_codes = frozenset({429, 500, 502, 503, 504})
+    else:
+        try:
+            retry_codes = frozenset(int(c) for c in retry_codes_raw)
+        except (TypeError, ValueError):
+            retry_codes = frozenset({429, 500, 502, 503, 504})
+    retries = RetryConfig(
+        max_attempts=retries_raw.get("max_attempts", 3),
+        initial_backoff_ms=retries_raw.get("initial_backoff_ms", 200),
+        max_backoff_ms=retries_raw.get("max_backoff_ms", 5_000),
+        retryable_status_codes=retry_codes,
+    ).normalized()
+
     return KubeSaverConfig(
         cloud_provider=provider,
         provider_tier=raw.get("provider_tier", "general"),
@@ -382,6 +408,7 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         tui=tui,
         export=export,
         timeouts=timeouts,
+        retries=retries,
     )
 
 
@@ -399,6 +426,9 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         KUBE_SAVER_TIMEOUT_CONNECT  - timeouts.connect_seconds
         KUBE_SAVER_TIMEOUT_READ     - timeouts.read_seconds
         KUBE_SAVER_TIMEOUT_OPERATION - timeouts.operation_seconds
+        KUBE_SAVER_RETRY_MAX_ATTEMPTS    - retries.max_attempts
+        KUBE_SAVER_RETRY_INITIAL_BACKOFF - retries.initial_backoff_ms
+        KUBE_SAVER_RETRY_MAX_BACKOFF     - retries.max_backoff_ms
     """
     env = os.environ
 
@@ -435,9 +465,20 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         with contextlib.suppress(ValueError):
             cfg.timeouts.operation_seconds = float(v)
 
+    if (v := _env("RETRY_MAX_ATTEMPTS")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.max_attempts = int(v)
+    if (v := _env("RETRY_INITIAL_BACKOFF")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.initial_backoff_ms = int(v)
+    if (v := _env("RETRY_MAX_BACKOFF")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.max_backoff_ms = int(v)
+
     # Re-normalize after env overrides so invalid values can never disable
-    # timeouts entirely.
+    # timeouts or produce absurd retry backoffs.
     cfg.timeouts = cfg.timeouts.normalized()
+    cfg.retries = cfg.retries.normalized()
 
     return cfg
 
@@ -536,6 +577,12 @@ def default_config_yaml() -> str:
             "connect_seconds": default.timeouts.connect_seconds,
             "read_seconds": default.timeouts.read_seconds,
             "operation_seconds": default.timeouts.operation_seconds,
+        },
+        "retries": {
+            "max_attempts": default.retries.max_attempts,
+            "initial_backoff_ms": default.retries.initial_backoff_ms,
+            "max_backoff_ms": default.retries.max_backoff_ms,
+            "retryable_status_codes": sorted(default.retries.retryable_status_codes),
         },
     }
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
