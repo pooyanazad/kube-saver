@@ -155,6 +155,64 @@ class TimeoutConfig:
 
 
 @dataclass
+class RetryConfig:
+    """Retry policy for transient Kubernetes API failures.
+
+    Applied to API calls via ``retry_call`` in ``collectors/retry.py``.
+    Defaults are conservative: a handful of attempts with short backoffs so
+    a flaky API server cannot block a scan for minutes.
+
+    Attributes:
+        max_attempts: Total number of attempts including the first call.
+            Must be >= 1 (1 = no retries). Default 3.
+        initial_backoff_ms: Base backoff in milliseconds for the first
+            retry. Subsequent waits grow exponentially. Must be > 0.
+        max_backoff_ms: Upper cap on a single backoff in milliseconds.
+            Prevents very long waits on high attempt counts. Must be > 0.
+        retryable_status_codes: HTTP status codes considered transient and
+            safe to retry (default 429 and the 5xx range).
+    """
+
+    max_attempts: int = 3
+    initial_backoff_ms: int = 200
+    max_backoff_ms: int = 5_000
+    retryable_status_codes: frozenset[int] = field(
+        default_factory=lambda: frozenset({429, 500, 502, 503, 504})
+    )
+
+    def normalized(self) -> RetryConfig:
+        """Return a copy with all values clamped to safe bounds.
+
+        Non-positive or non-integer values are replaced with the defaults so
+        a misconfigured file or env var can never disable retries entirely
+        nor produce absurd backoff durations.
+        """
+        def _clamp_int(value: Any, default: int, minimum: int) -> int:
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                return default
+            return max(v, minimum)
+
+        attempts = _clamp_int(self.max_attempts, 3, 1)
+        initial = _clamp_int(self.initial_backoff_ms, 200, 1)
+        cap = _clamp_int(self.max_backoff_ms, 5_000, 1)
+        if initial > cap:
+            initial = cap
+        codes = self.retryable_status_codes
+        if not isinstance(codes, (set, frozenset)) or not codes:
+            codes = frozenset({429, 500, 502, 503, 504})
+        else:
+            codes = frozenset(codes)
+        return RetryConfig(
+            max_attempts=attempts,
+            initial_backoff_ms=initial,
+            max_backoff_ms=cap,
+            retryable_status_codes=codes,
+        )
+
+
+@dataclass
 class ExportConfig:
     """Export-related settings.
 
@@ -197,6 +255,7 @@ class KubeSaverConfig:
     tui: TUIConfig = field(default_factory=TUIConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+    retries: RetryConfig = field(default_factory=RetryConfig)
 
     # ── helpers ────────────────────────────────────────────────────────────
 
@@ -489,6 +548,7 @@ __all__ = [
     "PricingOverrides",
     "TUIConfig",
     "TimeoutConfig",
+    "RetryConfig",
     "ExportConfig",
     "load_config",
     "default_config_yaml",
