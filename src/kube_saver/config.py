@@ -155,6 +155,74 @@ class TimeoutConfig:
 
 
 @dataclass
+class RetryConfig:
+    """Retry policy for transient Kubernetes API failures.
+
+    Applied to API calls via ``retry_call`` in ``collectors/retry.py``.
+    Defaults are conservative: a handful of attempts with short backoffs so
+    a flaky API server cannot block a scan for minutes.
+
+    Attributes:
+        max_attempts: Total number of attempts including the first call.
+            Must be >= 1 (1 = no retries). Default 3.
+        initial_backoff_ms: Base backoff in milliseconds for the first
+            retry. Subsequent waits grow exponentially. Must be > 0.
+        max_backoff_ms: Upper cap on a single backoff in milliseconds.
+            Prevents very long waits on high attempt counts. Must be > 0.
+        retryable_status_codes: HTTP status codes considered transient and
+            safe to retry (default 429 and the 5xx range).
+    """
+
+    max_attempts: int = 3
+    initial_backoff_ms: int = 200
+    max_backoff_ms: int = 5_000
+    retryable_status_codes: frozenset[int] = field(
+        default_factory=lambda: frozenset({429, 500, 502, 503, 504})
+    )
+
+    def normalized(self) -> RetryConfig:
+        """Return a copy with all values clamped to safe bounds.
+
+        Non-positive or non-integer values are replaced with the defaults so
+        a misconfigured file or env var can never disable retries entirely
+        nor produce absurd backoff durations. ``max_attempts`` is additionally
+        clamped to a floor of 1 so a stray zero never means "no calls".
+        """
+        def _clamp_attempts(value: Any, default: int) -> int:
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                return default
+            return max(v, 1)
+
+        def _positive_int(value: Any, default: int) -> int:
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                return default
+            if v <= 0:
+                return default
+            return v
+
+        attempts = _clamp_attempts(self.max_attempts, 3)
+        initial = _positive_int(self.initial_backoff_ms, 200)
+        cap = _positive_int(self.max_backoff_ms, 5_000)
+        if initial > cap:
+            initial = cap
+        codes = self.retryable_status_codes
+        if not isinstance(codes, (set, frozenset)) or not codes:
+            codes = frozenset({429, 500, 502, 503, 504})
+        else:
+            codes = frozenset(codes)
+        return RetryConfig(
+            max_attempts=attempts,
+            initial_backoff_ms=initial,
+            max_backoff_ms=cap,
+            retryable_status_codes=codes,
+        )
+
+
+@dataclass
 class ExportConfig:
     """Export-related settings.
 
@@ -197,6 +265,7 @@ class KubeSaverConfig:
     tui: TUIConfig = field(default_factory=TUIConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+    retries: RetryConfig = field(default_factory=RetryConfig)
 
     # ── helpers ────────────────────────────────────────────────────────────
 
@@ -306,6 +375,22 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         operation_seconds=timeouts_raw.get("operation_seconds", 60.0),
     ).normalized()
 
+    retries_raw = raw.get("retries", {})
+    retry_codes_raw = retries_raw.get("retryable_status_codes")
+    if retry_codes_raw is None:
+        retry_codes = frozenset({429, 500, 502, 503, 504})
+    else:
+        try:
+            retry_codes = frozenset(int(c) for c in retry_codes_raw)
+        except (TypeError, ValueError):
+            retry_codes = frozenset({429, 500, 502, 503, 504})
+    retries = RetryConfig(
+        max_attempts=retries_raw.get("max_attempts", 3),
+        initial_backoff_ms=retries_raw.get("initial_backoff_ms", 200),
+        max_backoff_ms=retries_raw.get("max_backoff_ms", 5_000),
+        retryable_status_codes=retry_codes,
+    ).normalized()
+
     return KubeSaverConfig(
         cloud_provider=provider,
         provider_tier=raw.get("provider_tier", "general"),
@@ -323,6 +408,7 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         tui=tui,
         export=export,
         timeouts=timeouts,
+        retries=retries,
     )
 
 
@@ -340,6 +426,9 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         KUBE_SAVER_TIMEOUT_CONNECT  - timeouts.connect_seconds
         KUBE_SAVER_TIMEOUT_READ     - timeouts.read_seconds
         KUBE_SAVER_TIMEOUT_OPERATION - timeouts.operation_seconds
+        KUBE_SAVER_RETRY_MAX_ATTEMPTS    - retries.max_attempts
+        KUBE_SAVER_RETRY_INITIAL_BACKOFF - retries.initial_backoff_ms
+        KUBE_SAVER_RETRY_MAX_BACKOFF     - retries.max_backoff_ms
     """
     env = os.environ
 
@@ -376,9 +465,20 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         with contextlib.suppress(ValueError):
             cfg.timeouts.operation_seconds = float(v)
 
+    if (v := _env("RETRY_MAX_ATTEMPTS")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.max_attempts = int(v)
+    if (v := _env("RETRY_INITIAL_BACKOFF")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.initial_backoff_ms = int(v)
+    if (v := _env("RETRY_MAX_BACKOFF")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.retries.max_backoff_ms = int(v)
+
     # Re-normalize after env overrides so invalid values can never disable
-    # timeouts entirely.
+    # timeouts or produce absurd retry backoffs.
     cfg.timeouts = cfg.timeouts.normalized()
+    cfg.retries = cfg.retries.normalized()
 
     return cfg
 
@@ -478,6 +578,12 @@ def default_config_yaml() -> str:
             "read_seconds": default.timeouts.read_seconds,
             "operation_seconds": default.timeouts.operation_seconds,
         },
+        "retries": {
+            "max_attempts": default.retries.max_attempts,
+            "initial_backoff_ms": default.retries.initial_backoff_ms,
+            "max_backoff_ms": default.retries.max_backoff_ms,
+            "retryable_status_codes": sorted(default.retries.retryable_status_codes),
+        },
     }
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
@@ -489,6 +595,7 @@ __all__ = [
     "PricingOverrides",
     "TUIConfig",
     "TimeoutConfig",
+    "RetryConfig",
     "ExportConfig",
     "load_config",
     "default_config_yaml",
