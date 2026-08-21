@@ -10,6 +10,7 @@ Covers:
 
 from __future__ import annotations
 
+import logging
 import sys
 import types
 from pathlib import Path
@@ -55,7 +56,7 @@ _install_fake_kubernetes()
 
 from kubernetes.client.rest import ApiException  # noqa: E402
 
-from kube_saver.collectors.retry import is_transient  # noqa: E402
+from kube_saver.collectors.retry import is_transient, retry_call  # noqa: E402
 
 # ── RetryConfig defaults + normalization (C2.1a) ──────────────────────────
 
@@ -306,3 +307,214 @@ class TestIsTransient:
         # 429 is not in the custom set, so it should not be transient.
         assert is_transient(_make_api_exception(429), cfg) is False
         assert is_transient(_make_api_exception(503), cfg) is True
+
+
+# ── retry_call helper (C2.2a, C2.2b) ──────────────────────────────────────
+
+
+class TestRetryCallSuccess:
+    def test_success_on_first_try(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            return "ok"
+
+        result = retry_call(
+            fn,
+            operation="get_pods",
+            retry_config=RetryConfig(max_attempts=3, initial_backoff_ms=1, max_backoff_ms=10),
+            sleep=sleeps.append,
+            jitter=lambda lo, hi: hi,
+        )
+        assert result == "ok"
+        assert len(calls) == 1
+        assert sleeps == []  # no retries, no sleep
+
+    def test_success_after_one_retry(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+        attempt_count = {"n": 0}
+
+        def fn() -> str:
+            attempt_count["n"] += 1
+            calls.append(attempt_count["n"])
+            if attempt_count["n"] == 1:
+                raise _make_api_exception(503)
+            return "recovered"
+
+        result = retry_call(
+            fn,
+            operation="get_pods",
+            retry_config=RetryConfig(
+                max_attempts=3, initial_backoff_ms=10, max_backoff_ms=100
+            ),
+            sleep=sleeps.append,
+            jitter=lambda lo, hi: hi,
+        )
+        assert result == "recovered"
+        assert calls == [1, 2]
+        assert len(sleeps) == 1
+
+
+class TestRetryCallExhaustion:
+    def test_exhaustion_raises_last_transient_error(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            raise _make_api_exception(503)
+
+        with pytest.raises(ApiException) as exc_info:
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=RetryConfig(
+                    max_attempts=3, initial_backoff_ms=1, max_backoff_ms=5
+                ),
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        assert exc_info.value.status == 503
+        assert len(calls) == 3
+        assert len(sleeps) == 2  # waits between 3 attempts
+
+    def test_non_transient_raises_immediately(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            raise _make_api_exception(401)
+
+        with pytest.raises(ApiException) as exc_info:
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=RetryConfig(max_attempts=3, initial_backoff_ms=1, max_backoff_ms=5),
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        assert exc_info.value.status == 401
+        assert len(calls) == 1  # non-transient: no retry
+        assert sleeps == []
+
+    def test_timeout_is_retried_then_raised(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            raise TimeoutError("request timed out")
+
+        with pytest.raises(TimeoutError):
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=RetryConfig(max_attempts=2, initial_backoff_ms=1, max_backoff_ms=5),
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        assert len(calls) == 2
+        assert len(sleeps) == 1
+
+
+class TestRetryCallBackoff:
+    def test_backoff_grows_exponentially_and_capped(self) -> None:
+        sleeps: list[float] = []
+        attempts: list[int] = []
+
+        def fn() -> str:
+            attempts.append(1)
+            raise _make_api_exception(503)
+
+        cfg = RetryConfig(
+            max_attempts=5, initial_backoff_ms=10, max_backoff_ms=100
+        )
+        with pytest.raises(ApiException):
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=cfg,
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        # backoffs: attempt1=10ms, attempt2=20ms, attempt3=40ms, attempt4=80ms -> 4 sleeps for 5 attempts
+        assert len(sleeps) == 4
+        # All in seconds; jitter returns hi so the sleep == backoff/1000
+        expected_ms = [10, 20, 40, 80]
+        for s, ms in zip(sleeps, expected_ms, strict=True):
+            assert s == pytest.approx(ms / 1_000.0)
+
+    def test_max_attempts_one_no_retries(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            raise _make_api_exception(503)
+
+        with pytest.raises(ApiException):
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=RetryConfig(max_attempts=1, initial_backoff_ms=1, max_backoff_ms=5),
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        assert len(calls) == 1
+        assert sleeps == []
+
+    def test_default_config_used_when_none(self) -> None:
+        calls: list[int] = []
+        sleeps: list[float] = []
+
+        def fn() -> str:
+            calls.append(1)
+            raise _make_api_exception(503)
+
+        with pytest.raises(ApiException):
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=None,
+                sleep=sleeps.append,
+                jitter=lambda lo, hi: hi,
+            )
+        assert len(calls) == 3  # default max_attempts
+
+
+class TestRetryCallLogging:
+    def test_logs_attempt_and_reason(self, caplog: pytest.LogCaptureFixture) -> None:
+        calls: list[int] = []
+        attempt_count = {"n": 0}
+
+        def fn() -> str:
+            attempt_count["n"] += 1
+            calls.append(attempt_count["n"])
+            if attempt_count["n"] < 3:
+                raise ApiException(status=503, reason="Service Unavailable")
+            return "ok"
+
+        with caplog.at_level(logging.WARNING, logger="kube_saver.collectors.retry"):
+            result = retry_call(
+                fn,
+                operation="list_pods",
+                retry_config=RetryConfig(
+                    max_attempts=3, initial_backoff_ms=1, max_backoff_ms=5
+                ),
+                sleep=lambda _: None,
+                jitter=lambda lo, hi: hi,
+            )
+        assert result == "ok"
+        warning_records = [
+            r for r in caplog.records if r.levelno == logging.WARNING
+        ]
+        assert warning_records, "expected at least one retry warning log"
+        first = warning_records[0]
+        assert "list_pods" in first.getMessage()
+        assert "attempt 1" in first.getMessage()
+        # The reason (the exception text) should be present.
+        assert "503" in first.getMessage()
