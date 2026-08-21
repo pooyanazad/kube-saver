@@ -15,10 +15,16 @@ that will never succeed on the second try.
 from __future__ import annotations
 
 import logging
+import random
+import time
+from collections.abc import Callable
+from typing import TypeVar
 
 from kube_saver.config import RetryConfig
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 try:
     from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
@@ -59,4 +65,92 @@ def is_transient(exc: BaseException, retry_config: RetryConfig | None = None) ->
     return isinstance(exc, (TimeoutError, ConnectionError))
 
 
-__all__ = ["ApiException", "is_transient"]
+def _backoff_ms(attempt: int, cfg: RetryConfig) -> float:
+    """Return the backoff in milliseconds for a given attempt (1-indexed).
+
+    Exponential growth capped at ``max_backoff_ms``. ``attempt=1`` is the
+    first retry, so the wait is ``initial_backoff_ms``. Each subsequent
+    retry doubles the base.
+
+    Args:
+        attempt: Retry attempt number, starting at 1.
+        cfg: Retry policy supplying backoff bounds.
+
+    Returns:
+        Capped backoff in milliseconds.
+    """
+    base = cfg.initial_backoff_ms * (2 ** max(attempt - 1, 0))
+    return float(min(base, cfg.max_backoff_ms))
+
+
+def retry_call(
+    fn: Callable[[], T],
+    *,
+    operation: str,
+    retry_config: RetryConfig | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    jitter: Callable[[float, float], float] = random.uniform,
+) -> T:
+    """Call ``fn()`` with bounded retries on transient failures.
+
+    Args:
+        fn: Zero-argument callable producing the result.
+        operation: Human-readable operation name used in log messages.
+        retry_config: Retry policy. When None, the default RetryConfig is
+            used. The config is normalized first so invalid values cannot
+            disable retries.
+        sleep: Sleep function used for backoff waits (injectable for tests).
+        jitter: Function returning a random float in ``[lo, hi)`` used to
+            jitter the backoff (injectable for tests).
+
+    Returns:
+        The value returned by ``fn`` on a successful attempt.
+
+    Raises:
+        Exception: The last exception raised by ``fn`` if all attempts
+            fail (or immediately if the failure is non-transient).
+    """
+    cfg = (retry_config or RetryConfig()).normalized()
+    last_exc: BaseException | None = None
+    for attempt in range(1, cfg.max_attempts + 1):
+        try:
+            result = fn()
+            if attempt > 1:
+                logger.info(
+                    "operation %s succeeded on attempt %d", operation, attempt
+                )
+            return result
+        except Exception as exc:
+            last_exc = exc
+            if not is_transient(exc, cfg) or attempt >= cfg.max_attempts:
+                if is_transient(exc, cfg):
+                    logger.error(
+                        "operation %s failed after %d attempts: %s",
+                        operation,
+                        attempt,
+                        exc,
+                    )
+                else:
+                    logger.error(
+                        "operation %s failed on attempt %d (non-transient): %s",
+                        operation,
+                        attempt,
+                        exc,
+                    )
+                raise
+            wait_ms = _backoff_ms(attempt, cfg)
+            wait_jittered = jitter(0.0, wait_ms)
+            logger.warning(
+                "operation %s attempt %d failed: %s; retrying in %.2fms",
+                operation,
+                attempt,
+                exc,
+                wait_jittered,
+            )
+            sleep(wait_jittered / 1_000.0)
+    # Unreachable: loop raises on the final attempt. Kept for type safety.
+    assert last_exc is not None
+    raise last_exc
+
+
+__all__ = ["ApiException", "is_transient", "retry_call"]
