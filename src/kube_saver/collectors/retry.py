@@ -83,6 +83,30 @@ def _backoff_ms(attempt: int, cfg: RetryConfig) -> float:
     return float(min(base, cfg.max_backoff_ms))
 
 
+def _reason(exc: BaseException) -> str:
+    """Return a short, stable reason string for an exception.
+
+    For ``ApiException`` we include the HTTP status so the log line stays
+    useful even when the exception's own ``str()`` is unhelpful. For
+    timeouts and connection errors we use the exception name plus any
+    message. Falls back to ``repr`` for unknown types.
+
+    Args:
+        exc: The exception raised by the API call.
+
+    Returns:
+        A short human-readable reason string suitable for log records.
+    """
+    if isinstance(exc, ApiException):
+        status = getattr(exc, "status", None)
+        reason = getattr(exc, "reason", None) or ""
+        if status is not None:
+            return f"http {status}".strip() if not reason else f"http {status}: {reason}".strip()
+        return reason or type(exc).__name__
+    msg = str(exc).strip()
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
+
 def retry_call(
     fn: Callable[[], T],
     *,
