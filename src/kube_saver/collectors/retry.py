@@ -141,35 +141,56 @@ def retry_call(
             result = fn()
             if attempt > 1:
                 logger.info(
-                    "operation %s succeeded on attempt %d", operation, attempt
+                    "operation %s succeeded on attempt %d/%d",
+                    operation,
+                    attempt,
+                    cfg.max_attempts,
+                    extra={
+                        "retry_operation": operation,
+                        "retry_attempt": attempt,
+                        "retry_max_attempts": cfg.max_attempts,
+                        "retry_outcome": "success",
+                    },
                 )
             return result
         except Exception as exc:
             last_exc = exc
+            reason = _reason(exc)
             if not is_transient(exc, cfg) or attempt >= cfg.max_attempts:
-                if is_transient(exc, cfg):
-                    logger.error(
-                        "operation %s failed after %d attempts: %s",
-                        operation,
-                        attempt,
-                        exc,
-                    )
-                else:
-                    logger.error(
-                        "operation %s failed on attempt %d (non-transient): %s",
-                        operation,
-                        attempt,
-                        exc,
-                    )
+                logger.error(
+                    "operation %s failed on attempt %d/%d: %s",
+                    operation,
+                    attempt,
+                    cfg.max_attempts,
+                    reason,
+                    extra={
+                        "retry_operation": operation,
+                        "retry_attempt": attempt,
+                        "retry_max_attempts": cfg.max_attempts,
+                        "retry_outcome": "exhausted"
+                        if is_transient(exc, cfg)
+                        else "non_transient",
+                        "retry_reason": reason,
+                    },
+                )
                 raise
             wait_ms = _backoff_ms(attempt, cfg)
             wait_jittered = jitter(0.0, wait_ms)
             logger.warning(
-                "operation %s attempt %d failed: %s; retrying in %.2fms",
+                "operation %s attempt %d/%d failed: %s; retrying in %.2fms",
                 operation,
                 attempt,
-                exc,
+                cfg.max_attempts,
+                reason,
                 wait_jittered,
+                extra={
+                    "retry_operation": operation,
+                    "retry_attempt": attempt,
+                    "retry_max_attempts": cfg.max_attempts,
+                    "retry_outcome": "retrying",
+                    "retry_reason": reason,
+                    "retry_backoff_ms": wait_jittered,
+                },
             )
             sleep(wait_jittered / 1_000.0)
     # Unreachable: loop raises on the final attempt. Kept for type safety.
