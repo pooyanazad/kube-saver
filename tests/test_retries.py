@@ -518,3 +518,68 @@ class TestRetryCallLogging:
         assert "attempt 1" in first.getMessage()
         # The reason (the exception text) should be present.
         assert "503" in first.getMessage()
+
+    def test_log_records_carry_structured_fields(self, caplog: pytest.LogCaptureFixture) -> None:
+        """C2.3b: log records must carry operation + attempt + reason as extra fields."""
+        attempt_count = {"n": 0}
+
+        def fn() -> str:
+            attempt_count["n"] += 1
+            if attempt_count["n"] < 2:
+                raise _make_api_exception(503, reason="Service Unavailable")
+            return "ok"
+
+        with caplog.at_level(logging.DEBUG, logger="kube_saver.collectors.retry"):
+            retry_call(
+                fn,
+                operation="list_nodes",
+                retry_config=RetryConfig(
+                    max_attempts=3, initial_backoff_ms=1, max_backoff_ms=5
+                ),
+                sleep=lambda _: None,
+                jitter=lambda lo, hi: hi,
+            )
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert warnings, "expected a retry warning record"
+        rec = warnings[0]
+        assert rec.__dict__.get("retry_operation") == "list_nodes"
+        assert rec.__dict__.get("retry_attempt") == 1
+        assert rec.__dict__.get("retry_max_attempts") == 3
+        assert rec.__dict__.get("retry_outcome") == "retrying"
+        assert "503" in rec.__dict__.get("retry_reason", "")
+
+        infos = [r for r in caplog.records if r.levelno == logging.INFO]
+        assert infos, "expected a success info record after recovery"
+        info_rec = infos[0]
+        assert info_rec.__dict__.get("retry_operation") == "list_nodes"
+        assert info_rec.__dict__.get("retry_attempt") == 2
+        assert info_rec.__dict__.get("retry_outcome") == "success"
+
+    def test_log_records_carry_exhaustion_fields(self, caplog: pytest.LogCaptureFixture) -> None:
+        """C2.3b: exhaustion must log the final attempt with outcome=exhausted."""
+        def fn() -> str:
+            raise _make_api_exception(503)
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="kube_saver.collectors.retry"),
+            pytest.raises(ApiException),
+        ):
+            retry_call(
+                fn,
+                operation="get_pods",
+                retry_config=RetryConfig(
+                    max_attempts=2, initial_backoff_ms=1, max_backoff_ms=5
+                ),
+                sleep=lambda _: None,
+                jitter=lambda lo, hi: hi,
+            )
+
+        errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert errors, "expected an error record on exhaustion"
+        rec = errors[0]
+        assert rec.__dict__.get("retry_operation") == "get_pods"
+        assert rec.__dict__.get("retry_attempt") == 2
+        assert rec.__dict__.get("retry_max_attempts") == 2
+        assert rec.__dict__.get("retry_outcome") == "exhausted"
+        assert "503" in rec.__dict__.get("retry_reason", "")
