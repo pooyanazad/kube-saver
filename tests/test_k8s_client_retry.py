@@ -277,3 +277,116 @@ class TestGetPodsRetries:
         assert result == []
         assert fakes["core_api"].list_namespaced_pod.call_count == 1
 
+
+# ── C2.4c: get_cluster_info retries version + list_node ───────────────────
+
+
+class _FakeNodeBuilder:
+    """Helper to build a minimal node-like object the client can parse."""
+
+    @staticmethod
+    def build(cpu: str, mem: str) -> MagicMock:
+        status = MagicMock(name="node-status")
+        status.allocatable = {"cpu": cpu, "memory": mem}
+        node = MagicMock(name="node")
+        node.status = status
+        return node
+
+
+class TestGetClusterInfoRetries:
+    def test_success_on_first_call(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        version_info = MagicMock(name="version_info")
+        version_info.git_version = "1.30.0"
+        fakes["version_api"].get_code.return_value = version_info
+        fakes["core_api"].list_node.return_value = MagicMock(
+            items=[_FakeNodeBuilder.build("4", "16Gi")]
+        )
+
+        info = client.get_cluster_info()
+
+        assert info.version == "1.30.0"
+        assert info.node_count == 1
+        assert info.total_cpu_millicores == 4000
+        assert fakes["version_api"].get_code.call_count == 1
+        assert fakes["core_api"].list_node.call_count == 1
+
+    def test_version_retries_then_recovers_on_503(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        version_info = MagicMock(name="version_info")
+        version_info.git_version = "1.31.0"
+        fakes["version_api"].get_code.side_effect = [
+            _make_api_exception(503, "Service Unavailable"),
+            version_info,
+        ]
+        fakes["core_api"].list_node.return_value = MagicMock(items=[])
+
+        info = client.get_cluster_info()
+
+        assert info.version == "1.31.0"
+        assert fakes["version_api"].get_code.call_count == 2
+
+    def test_version_falls_back_to_unknown_after_exhaustion(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        fakes["version_api"].get_code.side_effect = _make_api_exception(503)
+        fakes["core_api"].list_node.return_value = MagicMock(items=[])
+
+        info = client.get_cluster_info()
+
+        assert info.version == "unknown"
+        assert fakes["version_api"].get_code.call_count == 3
+
+    def test_list_node_retries_then_recovers_on_503(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        version_info = MagicMock(name="version_info")
+        version_info.git_version = "1.30.0"
+        fakes["version_api"].get_code.return_value = version_info
+        fakes["core_api"].list_node.side_effect = [
+            _make_api_exception(503, "Service Unavailable"),
+            MagicMock(items=[_FakeNodeBuilder.build("2", "8Gi")]),
+        ]
+
+        info = client.get_cluster_info()
+
+        assert info.node_count == 1
+        assert info.total_cpu_millicores == 2000
+        assert fakes["core_api"].list_node.call_count == 2
+
+    def test_list_node_falls_back_to_empty_after_exhaustion(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        version_info = MagicMock(name="version_info")
+        version_info.git_version = "1.30.0"
+        fakes["version_api"].get_code.return_value = version_info
+        fakes["core_api"].list_node.side_effect = _make_api_exception(502)
+
+        info = client.get_cluster_info()
+
+        assert info.node_count == 0
+        assert info.total_cpu_millicores == 0
+        assert fakes["core_api"].list_node.call_count == 3
+
+    def test_list_node_non_transient_4xx_returns_empty_without_retry(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        version_info = MagicMock(name="version_info")
+        version_info.git_version = "1.30.0"
+        fakes["version_api"].get_code.return_value = version_info
+        fakes["core_api"].list_node.side_effect = _make_api_exception(403, "Forbidden")
+
+        info = client.get_cluster_info()
+
+        assert info.node_count == 0
+        assert fakes["core_api"].list_node.call_count == 1
+
+
