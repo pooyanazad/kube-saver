@@ -14,7 +14,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from kube_saver.config import TimeoutConfig
+from kube_saver.collectors.retry import retry_call
+from kube_saver.config import RetryConfig, TimeoutConfig
 from kube_saver.models.core import (
     CloudProvider,
     ClusterInfo,
@@ -143,6 +144,7 @@ class K8sClient:
         "kube-system", "kube-public", "kube-node-lease",
     })
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+    retries: RetryConfig = field(default_factory=RetryConfig)
 
     _core_api: object = field(default=None, init=False, repr=False)
     _apps_api: object = field(default=None, init=False, repr=False)
@@ -301,14 +303,24 @@ class K8sClient:
     def get_namespaces(self) -> list[NamespaceInfo]:
         """Return all user-visible namespaces with their metadata.
 
-        Respects ``namespace_filter`` and ``exclude_namespaces``.
+        Respects ``namespace_filter`` and ``exclude_namespaces``. Transient
+        API failures (5xx, 429, timeouts) are retried via ``retry_call``
+        using the client's ``RetryConfig``; after exhaustion the final
+        error is treated as an RBAC failure and an empty list is returned.
         """
         try:
-            ns_list = self.core.list_namespace(
-                _request_timeout=self.timeouts.operation_seconds
-            ).items
+            ns_list = retry_call(
+                lambda: self.core.list_namespace(
+                    _request_timeout=self.timeouts.operation_seconds
+                ).items,
+                operation="list_namespace",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list namespaces (RBAC?): %s", exc)
+            return []
+        except Exception as exc:
+            logger.warning("Cannot list namespaces after retries: %s", exc)
             return []
 
         results: list[NamespaceInfo] = []
