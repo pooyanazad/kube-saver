@@ -355,15 +355,25 @@ class K8sClient:
         """Fetch all pods in a namespace with their resource data.
 
         Returns a list of ``PodResourceInfo`` objects populated with
-        resource requests/limits from the pod spec.
+        resource requests/limits from the pod spec. Transient API failures
+        (5xx, 429, timeouts) are retried via ``retry_call`` using the
+        client's ``RetryConfig``; after exhaustion the final error is
+        treated as an RBAC failure and an empty list is returned.
         """
         try:
-            pods = self.core.list_namespaced_pod(
-                namespace,
-                _request_timeout=self.timeouts.operation_seconds,
-            ).items
+            pods = retry_call(
+                lambda: self.core.list_namespaced_pod(
+                    namespace,
+                    _request_timeout=self.timeouts.operation_seconds,
+                ).items,
+                operation="list_namespaced_pod",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list pods in %s: %s", namespace, exc)
+            return []
+        except Exception as exc:
+            logger.warning("Cannot list pods in %s after retries: %s", namespace, exc)
             return []
 
         results: list[PodResourceInfo] = []

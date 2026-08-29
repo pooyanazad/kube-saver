@@ -193,3 +193,87 @@ class TestGetNamespacesRetries:
 
         assert result == []
         assert fakes["core_api"].list_namespace.call_count == 1
+
+
+# ── C2.4b: get_pods retries transient failures ────────────────────────────
+
+
+class _FakePodBuilder:
+    """Helper to build a minimal pod-like object the client can parse."""
+
+    @staticmethod
+    def build(name: str, namespace: str) -> MagicMock:
+        container = MagicMock(name=name + "-c")
+        container.name = name + "-c"
+        container.resources = {}
+
+        pod_spec = MagicMock(name=name + "-spec")
+        pod_spec.node_name = "node-1"
+        pod_spec.containers = [container]
+
+        meta = MagicMock(name=name + "-meta")
+        meta.name = name
+        meta.owner_references = []
+        meta.labels = {}
+        meta.annotations = {}
+
+        status = MagicMock(name=name + "-status")
+        status.container_statuses = []
+
+        pod = MagicMock(name=name)
+        pod.spec = pod_spec
+        pod.metadata = meta
+        pod.status = status
+        return pod
+
+
+class TestGetPodsRetries:
+    def test_success_on_first_call(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        pod = _FakePodBuilder.build("api-0", "default")
+        fakes["core_api"].list_namespaced_pod.return_value = MagicMock(items=[pod])
+
+        result = client.get_pods("default")
+
+        assert [p.name for p in result] == ["api-0"]
+        assert fakes["core_api"].list_namespaced_pod.call_count == 1
+
+    def test_retries_then_recovers_on_503(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        pod = _FakePodBuilder.build("api-0", "default")
+        fakes["core_api"].list_namespaced_pod.side_effect = [
+            _make_api_exception(503, "Service Unavailable"),
+            MagicMock(items=[pod]),
+        ]
+
+        result = client.get_pods("default")
+
+        assert [p.name for p in result] == ["api-0"]
+        assert fakes["core_api"].list_namespaced_pod.call_count == 2
+
+    def test_returns_empty_after_exhaustion(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        fakes["core_api"].list_namespaced_pod.side_effect = _make_api_exception(504)
+
+        result = client.get_pods("default")
+
+        assert result == []
+        assert fakes["core_api"].list_namespaced_pod.call_count == 3
+
+    def test_non_transient_4xx_returns_empty_without_retry(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        _patch_api_exception_type(monkeypatch)
+        client, fakes = _build_client(monkeypatch, tmp_path)
+
+        fakes["core_api"].list_namespaced_pod.side_effect = _make_api_exception(401, "Unauthorized")
+
+        result = client.get_pods("default")
+
+        assert result == []
+        assert fakes["core_api"].list_namespaced_pod.call_count == 1
+
