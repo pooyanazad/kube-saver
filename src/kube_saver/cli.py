@@ -36,7 +36,7 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     """Run the full analysis pipeline."""
     from kube_saver.config import load_config
     config = load_config()
-    client = K8sClient(timeouts=config.timeouts)
+    client = K8sClient(timeouts=config.timeouts, retries=config.retries)
     client.connect()
     pods = client.get_all_pods()
     namespaces = client.get_namespaces()

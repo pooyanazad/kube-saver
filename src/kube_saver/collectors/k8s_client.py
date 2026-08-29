@@ -14,7 +14,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from kube_saver.config import TimeoutConfig
+from kube_saver.collectors.retry import retry_call
+from kube_saver.config import RetryConfig, TimeoutConfig
 from kube_saver.models.core import (
     CloudProvider,
     ClusterInfo,
@@ -143,6 +144,7 @@ class K8sClient:
         "kube-system", "kube-public", "kube-node-lease",
     })
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+    retries: RetryConfig = field(default_factory=RetryConfig)
 
     _core_api: object = field(default=None, init=False, repr=False)
     _apps_api: object = field(default=None, init=False, repr=False)
@@ -263,21 +265,37 @@ class K8sClient:
         """Fetch basic cluster information and node totals.
 
         Returns a ``ClusterInfo`` with the sum of allocatable CPU and memory
-        across all worker nodes.
+        across all worker nodes. Both the version query and the node listing
+        are retried via ``retry_call`` using the client's ``RetryConfig`` so a
+        transient 5xx/429/timeout cannot blank out the cluster metadata;
+        after exhaustion each call falls back to its existing degraded value
+        (``version='unknown'`` and an empty node list).
         """
         op_timeout = self.timeouts.operation_seconds
         version = "unknown"
         try:
             version_api = k8s_client.VersionApi()
-            version_info = version_api.get_code(_request_timeout=op_timeout)
+            version_info = retry_call(
+                lambda: version_api.get_code(_request_timeout=op_timeout),
+                operation="get_version",
+                retry_config=self.retries,
+            )
             version = getattr(version_info, "git_version", None) or "unknown"
-        except Exception:
+        except Exception as exc:
+            logger.warning("Cannot fetch cluster version after retries: %s", exc)
             version = "unknown"
 
         try:
-            nodes = self.core.list_node(_request_timeout=op_timeout).items
+            nodes = retry_call(
+                lambda: self.core.list_node(_request_timeout=op_timeout).items,
+                operation="list_node",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list nodes (RBAC?): %s", exc)
+            nodes = []
+        except Exception as exc:
+            logger.warning("Cannot list nodes after retries: %s", exc)
             nodes = []
 
         total_cpu = 0
@@ -301,14 +319,24 @@ class K8sClient:
     def get_namespaces(self) -> list[NamespaceInfo]:
         """Return all user-visible namespaces with their metadata.
 
-        Respects ``namespace_filter`` and ``exclude_namespaces``.
+        Respects ``namespace_filter`` and ``exclude_namespaces``. Transient
+        API failures (5xx, 429, timeouts) are retried via ``retry_call``
+        using the client's ``RetryConfig``; after exhaustion the final
+        error is treated as an RBAC failure and an empty list is returned.
         """
         try:
-            ns_list = self.core.list_namespace(
-                _request_timeout=self.timeouts.operation_seconds
-            ).items
+            ns_list = retry_call(
+                lambda: self.core.list_namespace(
+                    _request_timeout=self.timeouts.operation_seconds
+                ).items,
+                operation="list_namespace",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list namespaces (RBAC?): %s", exc)
+            return []
+        except Exception as exc:
+            logger.warning("Cannot list namespaces after retries: %s", exc)
             return []
 
         results: list[NamespaceInfo] = []
@@ -343,15 +371,25 @@ class K8sClient:
         """Fetch all pods in a namespace with their resource data.
 
         Returns a list of ``PodResourceInfo`` objects populated with
-        resource requests/limits from the pod spec.
+        resource requests/limits from the pod spec. Transient API failures
+        (5xx, 429, timeouts) are retried via ``retry_call`` using the
+        client's ``RetryConfig``; after exhaustion the final error is
+        treated as an RBAC failure and an empty list is returned.
         """
         try:
-            pods = self.core.list_namespaced_pod(
-                namespace,
-                _request_timeout=self.timeouts.operation_seconds,
-            ).items
+            pods = retry_call(
+                lambda: self.core.list_namespaced_pod(
+                    namespace,
+                    _request_timeout=self.timeouts.operation_seconds,
+                ).items,
+                operation="list_namespaced_pod",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list pods in %s: %s", namespace, exc)
+            return []
+        except Exception as exc:
+            logger.warning("Cannot list pods in %s after retries: %s", namespace, exc)
             return []
 
         results: list[PodResourceInfo] = []

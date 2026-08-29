@@ -62,6 +62,7 @@ def load_data(config: KubeSaverConfig) -> TUIData:
             context=config.kubeconfig_context,
             exclude_namespaces=config.exclude_namespaces,
             timeouts=config.timeouts,
+            retries=config.retries,
         )
         client.connect()
     except Exception as exc:
