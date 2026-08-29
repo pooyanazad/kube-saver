@@ -44,11 +44,12 @@ class _FakeRuntimeCollector:
 
 
 class _FakeK8sClient:
-    def __init__(self, context=None, exclude_namespaces=None, namespace_filter=None, timeouts=None) -> None:
+    def __init__(self, context=None, exclude_namespaces=None, namespace_filter=None, timeouts=None, retries=None) -> None:
         self.context = context
         self.exclude_namespaces = exclude_namespaces or set()
         self.namespace_filter = namespace_filter
         self.timeouts = timeouts
+        self.retries = retries
         self.connected = False
 
     def connect(self) -> None:
@@ -112,7 +113,7 @@ class _FakeK8sClient:
 
 
 class _FailingK8sClient:
-    def __init__(self, context=None, exclude_namespaces=None, namespace_filter=None, timeouts=None) -> None:
+    def __init__(self, context=None, exclude_namespaces=None, namespace_filter=None, timeouts=None, retries=None) -> None:
         self.context = context
 
     def connect(self) -> None:
