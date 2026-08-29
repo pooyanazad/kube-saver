@@ -265,21 +265,37 @@ class K8sClient:
         """Fetch basic cluster information and node totals.
 
         Returns a ``ClusterInfo`` with the sum of allocatable CPU and memory
-        across all worker nodes.
+        across all worker nodes. Both the version query and the node listing
+        are retried via ``retry_call`` using the client's ``RetryConfig`` so a
+        transient 5xx/429/timeout cannot blank out the cluster metadata;
+        after exhaustion each call falls back to its existing degraded value
+        (``version='unknown'`` and an empty node list).
         """
         op_timeout = self.timeouts.operation_seconds
         version = "unknown"
         try:
             version_api = k8s_client.VersionApi()
-            version_info = version_api.get_code(_request_timeout=op_timeout)
+            version_info = retry_call(
+                lambda: version_api.get_code(_request_timeout=op_timeout),
+                operation="get_version",
+                retry_config=self.retries,
+            )
             version = getattr(version_info, "git_version", None) or "unknown"
-        except Exception:
+        except Exception as exc:
+            logger.warning("Cannot fetch cluster version after retries: %s", exc)
             version = "unknown"
 
         try:
-            nodes = self.core.list_node(_request_timeout=op_timeout).items
+            nodes = retry_call(
+                lambda: self.core.list_node(_request_timeout=op_timeout).items,
+                operation="list_node",
+                retry_config=self.retries,
+            )
         except ApiException as exc:
             logger.warning("Cannot list nodes (RBAC?): %s", exc)
+            nodes = []
+        except Exception as exc:
+            logger.warning("Cannot list nodes after retries: %s", exc)
             nodes = []
 
         total_cpu = 0
