@@ -357,6 +357,79 @@ class NamespaceWaste:
     efficiency_score: float = 100.0
 
 
+@dataclass
+class ScanResult:
+    """Outcome of a pod scan, including partial-failure state.
+
+    A scan can complete cleanly (``ok``), complete with some namespaces
+    skipped after retries were exhausted (``partial``), or fail to collect
+    any usable data (``failed``). The ``pods`` field always carries
+    whatever was successfully collected so callers can keep using the
+    partial data, and ``errors`` holds one human-readable string per
+    failure so the final API error is preserved instead of swallowed.
+
+    Exactly one of ``ok`` / ``partial`` / ``failed`` should be True. Use
+    the ``success`` / ``partial_success`` / ``failure`` classmethods to
+    build a correctly-normalized instance.
+
+    Attributes:
+        pods: Pods successfully collected before any failure.
+        ok: True when the scan completed with no errors.
+        partial: True when at least one namespace failed but some pods
+            were still collected.
+        failed: True when no usable pod data was collected.
+        errors: One human-readable string per failure encountered.
+    """
+
+    pods: list[PodResourceInfo] = field(default_factory=list)
+    ok: bool = True
+    partial: bool = False
+    failed: bool = False
+    errors: list[str] = field(default_factory=list)
+
+    @classmethod
+    def success(cls, pods: list[PodResourceInfo]) -> ScanResult:
+        """Build a fully-successful scan result with no errors."""
+        return cls(
+            pods=list(pods),
+            ok=True,
+            partial=False,
+            failed=False,
+            errors=[],
+        )
+
+    @classmethod
+    def partial_success(
+        cls,
+        pods: list[PodResourceInfo],
+        errors: list[str],
+    ) -> ScanResult:
+        """Build a partial result: some pods collected, with errors.
+
+        Args:
+            pods: Pods that were successfully collected.
+            errors: One human-readable string per failed namespace.
+        """
+        return cls(
+            pods=list(pods),
+            ok=False,
+            partial=True,
+            failed=False,
+            errors=list(errors),
+        )
+
+    @classmethod
+    def failure(cls, errors: list[str]) -> ScanResult:
+        """Build a total failure: no pods collected, with errors."""
+        return cls(
+            pods=[],
+            ok=False,
+            partial=False,
+            failed=True,
+            errors=list(errors),
+        )
+
+
 __all__ = [
     "CloudProvider",
     "MetricSource",
@@ -371,4 +444,5 @@ __all__ = [
     "Recommendation",
     "WasteReport",
     "NamespaceWaste",
+    "ScanResult",
 ]
