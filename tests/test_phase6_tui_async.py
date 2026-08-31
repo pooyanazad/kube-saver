@@ -165,6 +165,39 @@ async def test_textual_dashboard_renders() -> None:
 
 
 @pytest.mark.asyncio
+async def test_degraded_banner_shown_when_scan_partial() -> None:
+    """C3.2b: a DEGRADED banner appears in the summary and status."""
+    data = _sample_tui_data()
+    data.degraded = True
+    data.degraded_errors = ["team-b: http 503: Service Unavailable"]
+    app = _NavApp(data)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, Dashboard)
+
+        summary = app.screen.query_one(SummaryBar)
+        rendered = str(summary.render())
+        assert "DEGRADED" in rendered
+
+        status = app.screen.query_one("#status", Static)
+        status_text = str(status.renderable)
+        assert "DEGRADED" in status_text
+        assert "1 ns failed" in status_text
+
+
+@pytest.mark.asyncio
+async def test_no_degraded_banner_when_scan_clean() -> None:
+    """C3.2b: a clean scan renders no DEGRADED banner."""
+    data = _sample_tui_data()
+    data.degraded = False
+    app = _NavApp(data)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        summary = app.screen.query_one(SummaryBar)
+        assert "DEGRADED" not in str(summary.render())
+
+
+@pytest.mark.asyncio
 async def test_textual_navigation_between_screens() -> None:
     data = _sample_tui_data()
     app = _NavApp(data)
