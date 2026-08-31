@@ -187,11 +187,18 @@ class TestGetAllPodsScanResult:
         fakes["core_api"].list_namespace.return_value = MagicMock(
             items=[_namespace("team-a"), _namespace("team-b")]
         )
-        # team-a lists cleanly; team-b fails after retries are exhausted.
-        fakes["core_api"].list_namespaced_pod.side_effect = [
-            MagicMock(items=[_pod("api-0", "team-a")]),
-            _make_api_exception(503, "Service Unavailable"),
-        ]
+        # team-a lists cleanly on the first call; team-b raises a transient
+        # 503 on every attempt so it is retried until the budget is exhausted.
+        exc_503 = _make_api_exception(503, "Service Unavailable")
+
+        def _list_namespaced_pod(*args, **kwargs):
+            # The client iterates namespaces in order: team-a first, then team-b.
+            namespace = kwargs.get("namespace") or (args[0] if args else "")
+            if namespace == "team-a":
+                return MagicMock(items=[_pod("api-0", "team-a")])
+            raise exc_503
+
+        fakes["core_api"].list_namespaced_pod.side_effect = _list_namespaced_pod
 
         result = client.get_all_pods()
 
@@ -202,7 +209,7 @@ class TestGetAllPodsScanResult:
         assert len(result.errors) == 1
         assert result.errors[0].startswith("team-b:")
         assert "503" in result.errors[0]
-        # team-b exhausted 3 retry attempts.
+        # team-a (1) + team-b exhausted 3 retry attempts.
         assert fakes["core_api"].list_namespaced_pod.call_count == 1 + 3
 
     def test_partial_with_non_transient_failure_records_error(
@@ -239,8 +246,9 @@ class TestGetAllPodsScanResult:
         fakes["core_api"].list_namespace.return_value = MagicMock(
             items=[_namespace("team-a"), _namespace("team-b")]
         )
-        # Both namespaces fail after retries are exhausted.
-        fakes["core_api"].list_namespaced_pod.return_value = MagicMock(items=[])
+        # Both namespaces fail after retries are exhausted: the same
+        # transient 504 is raised on every call (side_effect set to an
+        # exception instance re-raises it each time, never exhausting).
         fakes["core_api"].list_namespaced_pod.side_effect = _make_api_exception(
             504, "Gateway Timeout"
         )

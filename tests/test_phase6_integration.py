@@ -151,8 +151,8 @@ class TestFakeK8sInventoryIntegration:
         pods = client.get_all_pods()
         assert client.connected is True
         assert [ns.name for ns in namespaces] == ["team-a"]
-        assert len(pods) == 1
-        assert pods[0].namespace == "team-a"
+        assert len(pods.pods) == 1
+        assert pods.pods[0].namespace == "team-a"
 
 
 class TestTuiDataIntegration:
