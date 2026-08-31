@@ -14,7 +14,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from kube_saver.collectors.retry import retry_call
+from kube_saver.collectors.retry import _reason, retry_call
 from kube_saver.config import RetryConfig, TimeoutConfig
 from kube_saver.models.core import (
     CloudProvider,
@@ -23,6 +23,7 @@ from kube_saver.models.core import (
     NamespaceInfo,
     PodResourceInfo,
     ResourceQuantities,
+    ScanResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -367,14 +368,26 @@ class K8sClient:
             logger.warning("Cannot list pods in %s: %s", namespace, exc)
             return 0
 
-    def get_pods(self, namespace: str) -> list[PodResourceInfo]:
-        """Fetch all pods in a namespace with their resource data.
+    def _collect_pods(
+        self, namespace: str
+    ) -> tuple[list[PodResourceInfo], str | None]:
+        """Fetch pods in a namespace, preserving the final API error.
 
-        Returns a list of ``PodResourceInfo`` objects populated with
-        resource requests/limits from the pod spec. Transient API failures
-        (5xx, 429, timeouts) are retried via ``retry_call`` using the
-        client's ``RetryConfig``; after exhaustion the final error is
-        treated as an RBAC failure and an empty list is returned.
+        Runs the per-namespace pod listing through ``retry_call`` so
+        transient 5xx/429/timeout failures are retried with backoff. When
+        retries are exhausted (or a non-transient RBAC failure occurs),
+        the final exception is translated into a short, stable reason
+        string and returned alongside an empty pod list so the caller can
+        record the failure rather than silently losing it.
+
+        Args:
+            namespace: Namespace to list pods in.
+
+        Returns:
+            A ``(pods, error)`` tuple where ``pods`` is the list of
+            ``PodResourceInfo`` objects parsed from the API response (empty
+            on failure) and ``error`` is a human-readable reason string for
+            the final failure, or ``None`` when the listing succeeded.
         """
         try:
             pods = retry_call(
@@ -386,11 +399,15 @@ class K8sClient:
                 retry_config=self.retries,
             )
         except ApiException as exc:
-            logger.warning("Cannot list pods in %s: %s", namespace, exc)
-            return []
+            reason = _reason(exc)
+            logger.warning("Cannot list pods in %s: %s", namespace, reason)
+            return [], reason
         except Exception as exc:
-            logger.warning("Cannot list pods in %s after retries: %s", namespace, exc)
-            return []
+            reason = _reason(exc)
+            logger.warning(
+                "Cannot list pods in %s after retries: %s", namespace, reason
+            )
+            return [], reason
 
         results: list[PodResourceInfo] = []
         for pod in pods:
@@ -433,14 +450,65 @@ class K8sClient:
                     restart_count=restarts,
                 )
             )
-        return results
+        return results, None
 
-    def get_all_pods(self) -> list[PodResourceInfo]:
-        """Fetch pods across all non-excluded namespaces."""
+    def get_pods(self, namespace: str) -> list[PodResourceInfo]:
+        """Fetch all pods in a namespace with their resource data.
+
+        Returns a list of ``PodResourceInfo`` objects populated with
+        resource requests/limits from the pod spec. Transient API failures
+        (5xx, 429, timeouts) are retried via ``retry_call`` using the
+        client's ``RetryConfig``; after exhaustion the final error is
+        treated as an RBAC failure and an empty list is returned.
+
+        Use ``get_all_pods`` when you also need the per-namespace failure
+        reasons surfaced as a ``ScanResult``.
+        """
+        pods, _error = self._collect_pods(namespace)
+        return pods
+
+    def get_all_pods(self) -> ScanResult:
+        """Fetch pods across all non-excluded namespaces as a ScanResult.
+
+        Iterates over every namespace returned by ``get_namespaces`` and
+        lists pods in each via ``_collect_pods``. The returned
+        ``ScanResult`` preserves the final API error for any namespace
+        whose pod listing failed after retries were exhausted:
+
+        * ``ok`` — every namespace listed cleanly, no errors.
+        * ``partial`` — at least one namespace failed but some pods were
+          still collected; ``errors`` holds one ``"namespace: reason"``
+          string per failure.
+        * ``failed`` — no pods could be collected (either no namespaces
+          were visible, or every namespace failed); ``errors`` records
+          the underlying reason(s) and ``pods`` is empty.
+
+        Args:
+            None.
+
+        Returns:
+            A ``ScanResult`` carrying the successfully collected pods and
+            one human-readable error string per failed namespace.
+        """
+        namespaces = self.get_namespaces()
+        if not namespaces:
+            return ScanResult.failure(
+                ["get_namespaces: no readable namespaces (RBAC or cluster down)"]
+            )
+
         all_pods: list[PodResourceInfo] = []
-        for ns in self.get_namespaces():
-            all_pods.extend(self.get_pods(ns.name))
-        return all_pods
+        errors: list[str] = []
+        for ns in namespaces:
+            pods, error = self._collect_pods(ns.name)
+            all_pods.extend(pods)
+            if error is not None:
+                errors.append(f"{ns.name}: {error}")
+
+        if errors and not all_pods:
+            return ScanResult.failure(errors)
+        if errors:
+            return ScanResult.partial_success(all_pods, errors)
+        return ScanResult.success(all_pods)
 
     def get_nodes_with_pods(self) -> dict[str, list[str]]:
         """Map node name to list of pod names running on it."""

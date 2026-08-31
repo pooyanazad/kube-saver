@@ -15,6 +15,7 @@ from kube_saver.models.core import (
     NamespaceInfo,
     PodResourceInfo,
     ResourceQuantities,
+    ScanResult,
 )
 from kube_saver.tui import data as tui_data
 from kube_saver.version import VERSION
@@ -75,7 +76,7 @@ class _FakeK8sClient:
             items = [ns for ns in items if ns.name in self.namespace_filter]
         return [ns for ns in items if ns.name not in self.exclude_namespaces]
 
-    def get_all_pods(self) -> list[PodResourceInfo]:
+    def get_all_pods(self) -> ScanResult:
         pods = [
             PodResourceInfo(
                 name="api-0",
@@ -109,7 +110,8 @@ class _FakeK8sClient:
             ),
         ]
         namespaces = {ns.name for ns in self.get_namespaces()}
-        return [pod for pod in pods if pod.namespace in namespaces]
+        visible = [pod for pod in pods if pod.namespace in namespaces]
+        return ScanResult.success(visible)
 
 
 class _FailingK8sClient:

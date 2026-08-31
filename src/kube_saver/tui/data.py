@@ -73,7 +73,7 @@ def load_data(config: KubeSaverConfig) -> TUIData:
     try:
         data.cluster = client.get_cluster_info()
         namespaces = client.get_namespaces()
-        pods = client.get_all_pods()
+        pods = client.get_all_pods().pods
     except Exception as exc:
         data.error = f"Failed to read cluster: {exc}"
         logger.warning("Cluster read failed: %s", exc)

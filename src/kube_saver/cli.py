@@ -38,7 +38,7 @@ def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommen
     config = load_config()
     client = K8sClient(timeouts=config.timeouts, retries=config.retries)
     client.connect()
-    pods = client.get_all_pods()
+    pods = client.get_all_pods().pods
     namespaces = client.get_namespaces()
 
     resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
