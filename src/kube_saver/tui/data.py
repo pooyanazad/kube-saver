@@ -48,6 +48,13 @@ class TUIData:
     metric_source: MetricSource = MetricSource.ESTIMATED
     loaded_at: datetime | None = None
     warnings: list[str] = field(default_factory=list)
+    # True when the pod scan completed only partially (some namespaces
+    # failed after retries) — the data shown is real but incomplete.
+    degraded: bool = False
+    # One human-readable error string per failed namespace (or the
+    # get_namespaces failure) when degraded. Surfaced in the TUI banner
+    # and the HTTP /api/v1/report JSON response.
+    degraded_errors: list[str] = field(default_factory=list)
 
 
 def load_data(config: KubeSaverConfig) -> TUIData:
@@ -73,7 +80,22 @@ def load_data(config: KubeSaverConfig) -> TUIData:
     try:
         data.cluster = client.get_cluster_info()
         namespaces = client.get_namespaces()
-        pods = client.get_all_pods()
+        scan = client.get_all_pods()
+        pods = scan.pods
+        # C3.2a: a partial (or fully-failed) scan marks the snapshot as
+        # degraded so the TUI and HTTP API can warn the user that the
+        # numbers shown are real but incomplete. A fully-failed scan
+        # still sets degraded (with no pods) so callers can distinguish
+        # "empty cluster" from "we couldn't see everything".
+        if scan.partial or scan.failed:
+            data.degraded = True
+            data.degraded_errors = list(scan.errors)
+            if scan.errors:
+                logger.warning(
+                    "Pod scan degraded — %d error(s): %s",
+                    len(scan.errors),
+                    "; ".join(scan.errors),
+                )
     except Exception as exc:
         data.error = f"Failed to read cluster: {exc}"
         logger.warning("Cluster read failed: %s", exc)

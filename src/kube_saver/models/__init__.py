@@ -17,6 +17,7 @@ from kube_saver.models.core import (
     Recommendation,
     ResourceQuantities,
     ResourceWaste,
+    ScanResult,
     WasteReport,
 )
 
@@ -33,5 +34,6 @@ __all__ = [
     "Recommendation",
     "ResourceQuantities",
     "ResourceWaste",
+    "ScanResult",
     "WasteReport",
 ]
