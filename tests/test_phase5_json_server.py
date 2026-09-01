@@ -22,6 +22,34 @@ def test_build_json_report() -> None:
     assert payload["recommendations"][0]["resource_type"] == "cpu-request"
 
 
+def test_build_json_report_degraded_fields() -> None:
+    """C3.2c: degraded state + errors are surfaced in the JSON payload."""
+    payload = build_json_report(
+        cluster=ClusterInfo(name="demo", context="ctx"),
+        resource_report=ResourceWasteReport(total_pods=1, metrics_available=True),
+        cost_report=CostWasteReport(),
+        recommendations=[],
+        degraded=True,
+        degraded_errors=["team-b: http 503: Service Unavailable"],
+    )
+    assert payload["degraded"] is True
+    assert payload["degraded_errors"] == ["team-b: http 503: Service Unavailable"]
+
+
+def test_build_json_report_omits_degraded_when_clean() -> None:
+    """C3.2c: a clean scan omits degraded fields (backward compatible)."""
+    payload = build_json_report(
+        cluster=ClusterInfo(name="demo", context="ctx"),
+        resource_report=ResourceWasteReport(total_pods=2, metrics_available=True),
+        cost_report=CostWasteReport(),
+        recommendations=[],
+        degraded=False,
+        degraded_errors=[],
+    )
+    assert payload["degraded"] is False
+    assert payload["degraded_errors"] == []
+
+
 
 def test_server_mode_endpoints() -> None:
     payload = {"ok": True, "items": 1}

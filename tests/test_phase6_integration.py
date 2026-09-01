@@ -15,6 +15,7 @@ from kube_saver.models.core import (
     NamespaceInfo,
     PodResourceInfo,
     ResourceQuantities,
+    ScanResult,
 )
 from kube_saver.tui import data as tui_data
 from kube_saver.version import VERSION
@@ -75,7 +76,7 @@ class _FakeK8sClient:
             items = [ns for ns in items if ns.name in self.namespace_filter]
         return [ns for ns in items if ns.name not in self.exclude_namespaces]
 
-    def get_all_pods(self) -> list[PodResourceInfo]:
+    def get_all_pods(self) -> ScanResult:
         pods = [
             PodResourceInfo(
                 name="api-0",
@@ -109,7 +110,8 @@ class _FakeK8sClient:
             ),
         ]
         namespaces = {ns.name for ns in self.get_namespaces()}
-        return [pod for pod in pods if pod.namespace in namespaces]
+        visible = [pod for pod in pods if pod.namespace in namespaces]
+        return ScanResult.success(visible)
 
 
 class _FailingK8sClient:
@@ -118,6 +120,38 @@ class _FailingK8sClient:
 
     def connect(self) -> None:
         raise RuntimeError("boom")
+
+
+class _DegradedK8sClient(_FakeK8sClient):
+    """Fake client whose pod scan is partial — team-b failed.
+
+    Used by C3.2d tests to prove a partial scan sets ``degraded=True`` on
+    the resulting ``TUIData`` without breaking the rest of the pipeline.
+    """
+
+    def get_all_pods(self) -> ScanResult:
+        # team-a collected cleanly; team-b failed after retries.
+        pods = [
+            PodResourceInfo(
+                name="api-0",
+                namespace="team-a",
+                workload_kind="Deployment",
+                workload_name="api",
+                resources=ResourceQuantities(
+                    cpu_millicores_request=1000,
+                    memory_bytes_request=1024 * 1024**2,
+                ),
+                actual=ActualUsage(
+                    cpu_millicores=100,
+                    memory_bytes=128 * 1024**2,
+                    source=MetricSource.METRICS_SERVER,
+                ),
+            ),
+        ]
+        return ScanResult.partial_success(
+            pods,
+            ["team-b: http 503: Service Unavailable"],
+        )
 
 
 class _FakeApp:
@@ -149,8 +183,8 @@ class TestFakeK8sInventoryIntegration:
         pods = client.get_all_pods()
         assert client.connected is True
         assert [ns.name for ns in namespaces] == ["team-a"]
-        assert len(pods) == 1
-        assert pods[0].namespace == "team-a"
+        assert len(pods.pods) == 1
+        assert pods.pods[0].namespace == "team-a"
 
 
 class TestTuiDataIntegration:
@@ -181,6 +215,39 @@ class TestTuiDataIntegration:
         assert data.connected is False
         assert data.error is not None
         assert "Connection failed" in data.error
+
+    def test_partial_scan_sets_degraded_flag(self, monkeypatch) -> None:
+        """C3.2d: a partial scan marks the snapshot degraded with the errors."""
+        monkeypatch.setattr(tui_data, "K8sClient", _DegradedK8sClient)
+        monkeypatch.setattr(tui_data, "RuntimeCollector", _FakeRuntimeCollector)
+
+        cfg = load_config()
+        cfg.exclude_namespaces = set()
+        data = tui_data.load_data(cfg)
+
+        # The pipeline still completes — we got partial data, not an error.
+        assert data.connected is True
+        assert data.error is None
+        assert data.resource_report is not None
+        assert data.resource_report.total_pods == 1
+        # And the degraded flag + errors are surfaced for the TUI/API.
+        assert data.degraded is True
+        assert len(data.degraded_errors) == 1
+        assert data.degraded_errors[0].startswith("team-b:")
+        assert "503" in data.degraded_errors[0]
+
+    def test_clean_scan_does_not_set_degraded(self, monkeypatch) -> None:
+        """C3.2d: a fully-successful scan leaves degraded=False."""
+        monkeypatch.setattr(tui_data, "K8sClient", _FakeK8sClient)
+        monkeypatch.setattr(tui_data, "RuntimeCollector", _FakeRuntimeCollector)
+
+        cfg = load_config()
+        cfg.exclude_namespaces = set()
+        data = tui_data.load_data(cfg)
+
+        assert data.connected is True
+        assert data.degraded is False
+        assert data.degraded_errors == []
 
 
 class TestCliIntegration:

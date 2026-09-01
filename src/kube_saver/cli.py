@@ -25,30 +25,40 @@ from kube_saver.analyzers.resource_waste import (
     analyze_resource_waste,
 )
 from kube_saver.collectors.k8s_client import K8sClient
-from kube_saver.models.core import Recommendation
+from kube_saver.models.core import Recommendation, ScanResult
 from kube_saver.pricing.engine import PricingEngine
 from kube_saver.recommenders.engine import generate_recommendations
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommendation]]:
-    """Run the full analysis pipeline."""
+def _run_analysis() -> tuple[
+    ResourceWasteReport, CostWasteReport, list[Recommendation], ScanResult
+]:
+    """Run the full analysis pipeline.
+
+    Returns the resource report, cost report, recommendations, and the
+    ``ScanResult`` from the pod scan so callers (the HTTP server) can
+    surface ``degraded`` state in their JSON response.
+    """
     from kube_saver.config import load_config
     config = load_config()
     client = K8sClient(timeouts=config.timeouts, retries=config.retries)
     client.connect()
-    pods = client.get_all_pods()
+    scan = client.get_all_pods()
+    pods = scan.pods
     namespaces = client.get_namespaces()
 
     resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
     pricing = PricingEngine()
     cost_report = analyze_cost_waste(resource_report, pricing)
     recs = generate_recommendations(resource_report, pricing, config=config)
-    return resource_report, cost_report, recs
+    return resource_report, cost_report, recs, scan
 
 
-def _safe_run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Recommendation]]:
+def _safe_run_analysis() -> tuple[
+    ResourceWasteReport, CostWasteReport, list[Recommendation], ScanResult
+]:
     """Run the analysis pipeline and translate failures into stable exit codes.
 
     Maps underlying exceptions to documented exit codes so CI and automation
@@ -59,6 +69,11 @@ def _safe_run_analysis() -> tuple[ResourceWasteReport, CostWasteReport, list[Rec
     * ApiException (HTTP 401/403)                  -> CONNECTION_ERROR (3)
     * ApiException (any other HTTP)                -> ANALYSIS_ERROR (4)
     * Any other exception                          -> GENERAL_ERROR (1)
+
+    Note: a *partial* scan (``ScanResult.partial``) is not an error — the
+    pipeline still completes and the ``ScanResult`` is returned so the
+    degraded flag can surface in the HTTP response. Exit codes only fire
+    when the pipeline cannot run at all.
     """
     # Resolve exception classes from the kubernetes package lazily so this
     # module can be imported without it installed.
@@ -171,7 +186,7 @@ def tui() -> None:
 @click.option("-o", "--output", default="kube-saver-report.html", help="Output HTML file path.")
 def report(output: str) -> None:
     """Generate a self-contained HTML executive report."""
-    resource_report, cost_report, recs = _safe_run_analysis()
+    resource_report, cost_report, recs, _scan = _safe_run_analysis()
     from kube_saver.exporters.report_generator import generate_html_report
     result = generate_html_report(resource_report, cost_report, recs)
     Path(output).write_text(result.html, encoding="utf-8")
@@ -185,7 +200,7 @@ def report(output: str) -> None:
 @click.option("-d", "--dir", "out_dir", default=".kube-saver", help="Output directory for plan files.")
 def pr_plan(out_dir: str) -> None:
     """Generate local PR plan files (summary, patches, review)."""
-    resource_report, cost_report, recs = _safe_run_analysis()
+    resource_report, cost_report, recs, _scan = _safe_run_analysis()
     from kube_saver.exporters.pr_generator import apply_plan_locally, generate_pr_plan
     plan = generate_pr_plan(recs)
     path = apply_plan_locally(plan, output_dir=out_dir)
@@ -204,7 +219,7 @@ def pr_plan(out_dir: str) -> None:
 @click.option("--threshold", default=100.0, help="Monthly USD threshold for spike alerts.")
 def notify(out_dir: str, threshold: float) -> None:
     """Write daily summary + spike alert Markdown files to disk."""
-    resource_report, cost_report, _recs = _safe_run_analysis()
+    resource_report, cost_report, _recs, _scan = _safe_run_analysis()
     from kube_saver.exporters.notifier import (
         build_daily_summary,
         build_spike_alert,
@@ -273,7 +288,7 @@ def serve(port: int, bind: str, expose: bool) -> None:
         click.echo(f"API bound to loopback ({bind}) — only local access permitted.")
 
     def _build_report() -> dict[str, object]:
-        rr, cr, recs = _safe_run_analysis()
+        rr, cr, recs, scan = _safe_run_analysis()
         from kube_saver.exporters.json_output import build_json_report
         from kube_saver.models.core import ClusterInfo
         return build_json_report(
@@ -281,6 +296,8 @@ def serve(port: int, bind: str, expose: bool) -> None:
             resource_report=rr,
             cost_report=cr,
             recommendations=recs,
+            degraded=scan.partial or scan.failed,
+            degraded_errors=scan.errors,
         )
 
     server = build_server(report_builder=_build_report, host=bind, port=port)

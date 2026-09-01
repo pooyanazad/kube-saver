@@ -15,6 +15,7 @@ from kube_saver.models.core import (
     Recommendation,
     ResourceQuantities,
     ResourceWaste,
+    ScanResult,
     WasteReport,
 )
 
@@ -120,3 +121,59 @@ def test_resource_waste_default_zero() -> None:
     rw = ResourceWaste()
     assert rw.cpu_millicores == 0.0
     assert rw.memory_bytes == 0
+
+
+# ── ScanResult (C3.1a) ────────────────────────────────────────────────────
+
+
+def test_scan_result_default_is_ok() -> None:
+    """A freshly-constructed ScanResult defaults to a clean, ok state."""
+    result = ScanResult()
+    assert result.ok is True
+    assert result.partial is False
+    assert result.failed is False
+    assert result.errors == []
+    assert result.pods == []
+
+
+def test_scan_result_success_factory() -> None:
+    """success() marks ok with the pods and no errors."""
+    pod = PodResourceInfo(name="api-0", namespace="default")
+    result = ScanResult.success([pod])
+    assert result.ok is True
+    assert result.partial is False
+    assert result.failed is False
+    assert result.errors == []
+    assert [p.name for p in result.pods] == ["api-0"]
+
+
+def test_scan_result_partial_success_factory() -> None:
+    """partial_success() keeps collected pods and records errors."""
+    pod = PodResourceInfo(name="api-0", namespace="default")
+    result = ScanResult.partial_success(
+        [pod],
+        ["team-b: http 503: Service Unavailable"],
+    )
+    assert result.ok is False
+    assert result.partial is True
+    assert result.failed is False
+    assert result.errors == ["team-b: http 503: Service Unavailable"]
+    assert [p.name for p in result.pods] == ["api-0"]
+
+
+def test_scan_result_failure_factory() -> None:
+    """failure() carries no pods and preserves the final error string."""
+    result = ScanResult.failure(["get_namespaces: http 401: Unauthorized"])
+    assert result.ok is False
+    assert result.partial is False
+    assert result.failed is True
+    assert result.pods == []
+    assert result.errors == ["get_namespaces: http 401: Unauthorized"]
+
+
+def test_scan_result_success_factory_copies_pod_list() -> None:
+    """success() copies the input list so later mutation is isolated."""
+    pods = [PodResourceInfo(name="api-0", namespace="default")]
+    result = ScanResult.success(pods)
+    pods.append(PodResourceInfo(name="other", namespace="default"))
+    assert [p.name for p in result.pods] == ["api-0"]

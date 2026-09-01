@@ -88,8 +88,14 @@ class SummaryBar(Widget):
         waste_cost = d.cost_report.total_cost_waste.monthly_usd if d.cost_report else 0
         eff = 100 - (d.cost_report.waste_ratio * 100) if d.cost_report else 100
         sym = _sym(d)
+        # C3.2b: prominent DEGRADED banner when the pod scan was partial.
+        banner = (
+            " [bold yellow]⚠ DEGRADED[/bold yellow] "
+            if d.degraded
+            else " "
+        )
         return (
-            f" {c.name} v{c.version} | "
+            f"{banner}{c.name} v{c.version} | "
             f"Nodes {c.node_count} | NS {ns_count} | Pods {pod_count} | "
             f"CPU waste {waste_cpu:.0f}m | Mem waste {waste_mem / 1024**2:.0f}Mi | "
             f"Waste {sym}{waste_cost * d.exchange_rate:.2f}/mo | "
@@ -147,7 +153,17 @@ class Dashboard(Screen):
         else:
             metrics = "[yellow]estimated[/yellow]"
         warn = " [yellow]fallback[/yellow]" if getattr(d, "warnings", []) else ""
-        return f"  kube-saver v{VERSION} │ {conn} │ {metrics}{warn} │ updated {ts} │ {d.currency.code}"
+        # C3.2b: append a degraded marker and the failed-namespace count
+        # to the status line so the reason is visible without scrolling.
+        degraded = (
+            f" │ [bold yellow]DEGRADED: {len(d.degraded_errors)} ns failed[/bold yellow]"
+            if d.degraded
+            else ""
+        )
+        return (
+            f"  kube-saver v{VERSION} │ {conn} │ {metrics}{warn} │ "
+            f"updated {ts} │ {d.currency.code}{degraded}"
+        )
 
     def on_mount(self) -> None:
         table = self.query_one("#ns_table", DataTable)
