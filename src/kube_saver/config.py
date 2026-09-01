@@ -223,6 +223,28 @@ class RetryConfig:
 
 
 @dataclass
+class RuntimeConfig:
+    """Settings for runtime metrics collection.
+
+    Attributes:
+        max_metric_age_seconds: Maximum age accepted for a metrics-server
+            sample before it is treated as unavailable. Must be positive.
+    """
+
+    max_metric_age_seconds: float = 300.0
+
+    def normalized(self) -> RuntimeConfig:
+        """Return a copy with a safe positive metric age limit."""
+        try:
+            value = float(self.max_metric_age_seconds)
+        except (TypeError, ValueError):
+            value = 300.0
+        if value != value or value in (float("inf"), float("-inf")) or value <= 0:
+            value = 300.0
+        return RuntimeConfig(max_metric_age_seconds=value)
+
+
+@dataclass
 class ExportConfig:
     """Export-related settings.
 
@@ -264,6 +286,7 @@ class KubeSaverConfig:
     pricing: PricingOverrides = field(default_factory=PricingOverrides)
     tui: TUIConfig = field(default_factory=TUIConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
+    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
     retries: RetryConfig = field(default_factory=RetryConfig)
 
@@ -368,6 +391,11 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         git_author_email=export_raw.get("git_author_email", "kube-saver@localhost"),
     )
 
+    runtime_raw = raw.get("runtime", {})
+    runtime = RuntimeConfig(
+        max_metric_age_seconds=runtime_raw.get("max_metric_age_seconds", 300.0),
+    ).normalized()
+
     timeouts_raw = raw.get("timeouts", {})
     timeouts = TimeoutConfig(
         connect_seconds=timeouts_raw.get("connect_seconds", 10.0),
@@ -407,6 +435,7 @@ def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
         pricing=pricing,
         tui=tui,
         export=export,
+        runtime=runtime,
         timeouts=timeouts,
         retries=retries,
     )
@@ -426,6 +455,7 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         KUBE_SAVER_TIMEOUT_CONNECT  - timeouts.connect_seconds
         KUBE_SAVER_TIMEOUT_READ     - timeouts.read_seconds
         KUBE_SAVER_TIMEOUT_OPERATION - timeouts.operation_seconds
+        KUBE_SAVER_MAX_METRIC_AGE_SECONDS - runtime.max_metric_age_seconds
         KUBE_SAVER_RETRY_MAX_ATTEMPTS    - retries.max_attempts
         KUBE_SAVER_RETRY_INITIAL_BACKOFF - retries.initial_backoff_ms
         KUBE_SAVER_RETRY_MAX_BACKOFF     - retries.max_backoff_ms
@@ -455,6 +485,9 @@ def _apply_env_overrides(cfg: KubeSaverConfig) -> KubeSaverConfig:
         cfg.pricing.memory_per_gb_hour_usd = float(v)
     if (v := _env("REFRESH_SECS")) is not None:
         cfg.tui.refresh_interval_seconds = int(v)
+    if (v := _env("MAX_METRIC_AGE_SECONDS")) is not None:
+        with contextlib.suppress(ValueError):
+            cfg.runtime.max_metric_age_seconds = float(v)
     if (v := _env("TIMEOUT_CONNECT")) is not None:
         with contextlib.suppress(ValueError):
             cfg.timeouts.connect_seconds = float(v)
@@ -573,6 +606,9 @@ def default_config_yaml() -> str:
             "git_author_name": default.export.git_author_name,
             "git_author_email": default.export.git_author_email,
         },
+        "runtime": {
+            "max_metric_age_seconds": default.runtime.max_metric_age_seconds,
+        },
         "timeouts": {
             "connect_seconds": default.timeouts.connect_seconds,
             "read_seconds": default.timeouts.read_seconds,
@@ -594,6 +630,7 @@ __all__ = [
     "AlertConfig",
     "PricingOverrides",
     "TUIConfig",
+    "RuntimeConfig",
     "TimeoutConfig",
     "RetryConfig",
     "ExportConfig",
