@@ -56,3 +56,6 @@ htmlcov/
 .kube-saver/
 .kube-saver.db
 .kube-saver.cache
+
+# Claude Code local configuration
+.claude/
