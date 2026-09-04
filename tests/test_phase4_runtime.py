@@ -1,7 +1,10 @@
 """Tests for Phase 4 runtime collection and eBPF fallback."""
 
+from datetime import datetime, timedelta
+
 from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.ebpf_safety import check_ebpf_safety
+from kube_saver.collectors.metrics import MetricSample
 from kube_saver.collectors.runtime import RuntimeCollector
 from kube_saver.models.core import (
     ActualUsage,
@@ -38,6 +41,39 @@ def test_ebpf_collector_returns_structured_result() -> None:
     assert isinstance(result.warnings, list)
     if not result.supported:
         assert result.available is False
+
+
+def test_metric_sample_captures_collection_timestamp() -> None:
+    collected_at = datetime.now()
+    sample = MetricSample(12.0, 1024, collected_at)
+    assert sample.collected_at == collected_at
+
+
+def test_runtime_collector_marks_stale_metrics_unavailable() -> None:
+    collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
+    pod = _pod()
+    pod.actual.observed_at = datetime.now() - timedelta(seconds=61)
+    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.available = True
+
+    result = collector.collect_all_pods([pod])
+
+    assert result.metrics_available is False
+    assert pod.actual.source is MetricSource.ESTIMATED
+    assert result.advanced_metrics["default/demo"].source == MetricSource.ESTIMATED.value
+
+
+def test_runtime_collector_accepts_fresh_metrics() -> None:
+    collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
+    pod = _pod()
+    pod.actual.observed_at = datetime.now()
+    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.available = True
+
+    result = collector.collect_all_pods([pod])
+
+    assert result.metrics_available is True
+    assert result.advanced_metrics["default/demo"].source == MetricSource.METRICS_SERVER.value
 
 
 def test_runtime_collector_falls_back_cleanly() -> None:
