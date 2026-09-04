@@ -9,6 +9,7 @@ Implements the fallback chain:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.metrics import MetricsCollector
@@ -33,13 +34,30 @@ class RuntimeCollectionResult:
 class RuntimeCollector:
     """Runtime collector with eBPF-first fallback behavior."""
 
-    def __init__(self, prefer_ebpf: bool = True) -> None:
+    def __init__(
+        self,
+        prefer_ebpf: bool = True,
+        max_metric_age_seconds: float = 300.0,
+    ) -> None:
         self.prefer_ebpf = prefer_ebpf
+        self.max_metric_age_seconds = max(max_metric_age_seconds, 0.0)
         self.ebpf = EbpfCollector()
         self.metrics = MetricsCollector()
 
+    def _is_metric_fresh(self, observed_at: datetime, now: datetime) -> bool:
+        """Return whether a metric is no older than the configured limit."""
+        age_seconds = (now - observed_at).total_seconds()
+        return age_seconds <= self.max_metric_age_seconds
+
+    def _mark_unavailable(self, pod: PodResourceInfo) -> ActualUsage:
+        """Replace stale pod usage with an estimated unavailable sample."""
+        usage = ActualUsage(source=MetricSource.ESTIMATED)
+        pod.actual = usage
+        return usage
+
     def collect_all_pods(self, pods: list[PodResourceInfo]) -> RuntimeCollectionResult:
         result = RuntimeCollectionResult()
+        now = datetime.now()
 
         if self.prefer_ebpf:
             ebpf_result = self.ebpf.collect_all_pods(pods)
@@ -60,12 +78,18 @@ class RuntimeCollector:
         metric_map = self.metrics.collect_all_pods(pods)
         if self.metrics.available:
             result.source = MetricSource.METRICS_SERVER
-            result.metrics_available = True
             for pod in pods:
                 key = f"{pod.namespace}/{pod.name}"
                 usage = metric_map.get(pod.name)
-                if usage is None:
-                    usage = pod.actual
+                if usage is None or not self._is_metric_fresh(usage.observed_at, now):
+                    if usage is not None:
+                        result.warnings.append(
+                            f"metric sample for {key} is older than "
+                            f"{self.max_metric_age_seconds:g} seconds; treating it as unavailable"
+                        )
+                    usage = self._mark_unavailable(pod)
+                else:
+                    result.metrics_available = True
                 result.advanced_metrics[key] = AdvancedRuntimeMetrics(
                     pod_name=pod.name,
                     namespace=pod.namespace,
@@ -73,10 +97,11 @@ class RuntimeCollector:
                     memory=MemoryBreakdown(working_set_bytes=usage.memory_bytes),
                     network=NetworkIO(),
                     disk=DiskIO(),
-                    source=MetricSource.METRICS_SERVER.value,
+                    source=usage.source.value,
                     idle_hint=usage.cpu_millicores == 0 and usage.memory_bytes < 16 * 1024**2,
                 )
-            return result
+            if result.metrics_available:
+                return result
 
         result.source = MetricSource.ESTIMATED
         result.metrics_available = False
