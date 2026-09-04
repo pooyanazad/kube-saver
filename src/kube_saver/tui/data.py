@@ -101,7 +101,10 @@ def load_data(config: KubeSaverConfig) -> TUIData:
         logger.warning("Cluster read failed: %s", exc)
         return data
 
-    runtime = RuntimeCollector(prefer_ebpf=True)
+    runtime = RuntimeCollector(
+        prefer_ebpf=True,
+        max_metric_age_seconds=config.runtime.max_metric_age_seconds,
+    )
     runtime_result = runtime.collect_all_pods(pods)
     data.metrics_available = runtime_result.metrics_available
     data.metric_source = runtime_result.source

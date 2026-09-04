@@ -31,8 +31,13 @@ class _FakeRuntimeResult:
 
 
 class _FakeRuntimeCollector:
-    def __init__(self, prefer_ebpf: bool = True) -> None:
+    def __init__(
+        self,
+        prefer_ebpf: bool = True,
+        max_metric_age_seconds: float = 300.0,
+    ) -> None:
         self.prefer_ebpf = prefer_ebpf
+        self.max_metric_age_seconds = max_metric_age_seconds
 
     def collect_all_pods(self, pods: list[PodResourceInfo]) -> _FakeRuntimeResult:
         return _FakeRuntimeResult(
