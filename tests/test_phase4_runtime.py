@@ -61,6 +61,7 @@ def test_runtime_collector_marks_stale_metrics_unavailable() -> None:
     assert result.metrics_available is False
     assert pod.actual.source is MetricSource.ESTIMATED
     assert result.advanced_metrics["default/demo"].source == MetricSource.ESTIMATED.value
+    assert any("stale metric sample for default/demo" in warning for warning in result.warnings)
 
 
 def test_runtime_collector_accepts_fresh_metrics() -> None:
