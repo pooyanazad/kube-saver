@@ -84,7 +84,7 @@ class RuntimeCollector:
                 if usage is None or not self._is_metric_fresh(usage.observed_at, now):
                     if usage is not None:
                         result.warnings.append(
-                            f"metric sample for {key} is older than "
+                            f"stale metric sample for {key}: older than "
                             f"{self.max_metric_age_seconds:g} seconds; treating it as unavailable"
                         )
                     usage = self._mark_unavailable(pod)
