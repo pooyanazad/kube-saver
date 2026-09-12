@@ -74,7 +74,9 @@ def test_runtime_collector_accepts_fresh_metrics() -> None:
     result = collector.collect_all_pods([pod])
 
     assert result.metrics_available is True
+    assert result.source is MetricSource.METRICS_SERVER
     assert result.advanced_metrics["default/demo"].source == MetricSource.METRICS_SERVER.value
+    assert pod.actual.source is MetricSource.METRICS_SERVER
 
 
 def test_runtime_collector_falls_back_cleanly() -> None:
