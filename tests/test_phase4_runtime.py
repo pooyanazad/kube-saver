@@ -81,6 +81,25 @@ def test_runtime_collector_accepts_fresh_metrics() -> None:
     assert pod.actual.source is MetricSource.METRICS_SERVER
 
 
+def test_runtime_collector_marks_only_missing_pods_unavailable() -> None:
+    """Pods missing from the metrics response drop to estimated, others stay real."""
+    collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
+    fresh_pod = _pod(name="fresh-pod")
+    missing_pod = _pod(name="missing-pod")
+    fresh_pod.actual.observed_at = datetime.now()
+    collector.metrics.collect_all_pods = lambda pods: {fresh_pod.name: fresh_pod.actual}
+    collector.metrics.available = True
+
+    result = collector.collect_all_pods([fresh_pod, missing_pod])
+
+    assert result.metrics_available is True
+    assert result.source is MetricSource.METRICS_SERVER
+    assert fresh_pod.actual.source is MetricSource.METRICS_SERVER
+    assert missing_pod.actual.source is MetricSource.ESTIMATED
+    assert result.advanced_metrics["default/fresh-pod"].source == MetricSource.METRICS_SERVER.value
+    assert result.advanced_metrics["default/missing-pod"].source == MetricSource.ESTIMATED.value
+
+
 def test_runtime_collector_falls_back_cleanly() -> None:
     collector = RuntimeCollector(prefer_ebpf=True)
     collector.metrics.collect_all_pods = lambda pods: {p.name: p.actual for p in pods}
