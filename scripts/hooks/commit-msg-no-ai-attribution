@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Reject commit messages that attribute Claude, Anthropic, or any AI co-author.
+set -euo pipefail
+
+msg_file="${1:-}"
+if [[ -z "$msg_file" ]]; then
+  echo "commit-msg hook: missing commit message file argument" >&2
+  exit 1
+fi
+
+deny_patterns=(
+  'Co-Authored-By: Claude'
+  'Co-Authored-By:.*anthropic\.com'
+  'Co-Authored-By:.*noreply'
+  'Generated-by:.*Claude'
+  'Generated-by:.*Anthropic'
+)
+
+for pattern in "${deny_patterns[@]}"; do
+  if grep -Eq "$pattern" "$msg_file"; then
+    echo "commit-msg: rejecting AI attribution trailer matching /$pattern/" >&2
+    echo "Edit the commit message to remove any Claude / Anthropic co-author lines." >&2
+    exit 1
+  fi
+done
+
+exit 0
