@@ -73,12 +73,18 @@ docker run --rm kube-saver:local version
 
 ## Pull requests
 
+Before starting work, contributors should check whether an open issue exists for the proposed change. If one exists, they should comment on the issue to indicate that they are working on it, or ask a maintainer to assign it to them. This helps prevent duplicated work.
+
+For bug fixes that involve more than 50 lines of code and tests combined, contributors must create an issue first if no relevant issue already exists, and reference that issue in the pull request.
+
 Only the following contribution types are expected to be approved:
 
 - changes that address an existing open issue
 - critical bug fixes that protect correctness, reliability, or release quality
 
 Pull requests outside those categories may be closed without merge.
+
+All contributors must make changes and push commits only to the `dev` branch. Direct pushes to the `main` branch are not allowed. Changes intended for `main` must be submitted through a pull request from `dev`.
 
 Please keep pull requests:
 
