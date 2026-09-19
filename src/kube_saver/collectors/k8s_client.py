@@ -29,17 +29,18 @@ from kube_saver.models.core import (
 logger = logging.getLogger(__name__)
 
 # ── C5.1a: audit of broad ``except Exception`` handlers ────────────────────
-# Five sites keep an intentional broad catch. They are all last-resort
+# Three sites keep an intentional broad catch. They are all last-resort
 # fallbacks that sit *after* the typed ``ApiException`` catch, so they only
 # fire for unexpected errors (timeouts, malformed payloads, library bugs).
 # Each one degrades rather than crashing the scan; they are scheduled for
 # typed replacement under C5.2a/b/c.
 #
 #   self.connect()          (context lookup)   -> pass to load_kube_config
-#   get_cluster_info()      (version query)    -> version = "unknown"
-#   get_cluster_info()      (node listing)     -> nodes = []
 #   get_namespaces()        (namespace list)   -> return []
 #   _collect_pods()         (pod listing)      -> return [], reason
+#
+# The two ``get_cluster_info`` handlers (version query -> "unknown", node
+# listing -> []) were replaced with typed catches under C5.2a.
 
 # ── Kubernetes API imports (lazy so the module can be imported even without
 # the kubernetes package installed — useful for unit tests). ────────────────
@@ -309,10 +310,10 @@ class K8sClient:
                 retry_config=self.retries,
             )
         except ApiException as exc:
-            logger.warning("Cannot list nodes (RBAC?): %s", exc)
+            logger.warning("Cannot list nodes (RBAC?): %s", _reason(exc))
             nodes = []
-        except Exception as exc:
-            logger.warning("Cannot list nodes after retries: %s", exc)
+        except (TimeoutError, ConnectionError) as exc:
+            logger.warning("Cannot list nodes after retries: %s", _reason(exc))
             nodes = []
 
         total_cpu = 0
