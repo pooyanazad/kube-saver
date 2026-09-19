@@ -24,6 +24,17 @@ Before opening an issue or PR, check the docs:
 - Verify changes with linting, typing, and tests before opening a pull request.
 - Avoid introducing maintainer-owned external service requirements for core functionality.
 
+## Regression tests
+
+Every bug fix must include a new or updated regression test that fails before
+the fix and passes after it. For example, retry behavior is covered in
+[`tests/test_retries.py`](tests/test_retries.py). Run the focused checks locally
+before opening a PR:
+
+```sh
+.venv/bin/ruff check src tests && .venv/bin/mypy src && .venv/bin/python -m pytest tests
+```
+
 ## Development setup
 
 ```bash
