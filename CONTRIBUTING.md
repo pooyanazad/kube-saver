@@ -143,3 +143,12 @@ kube-saver supports programmatic use from Python scripts and CI pipelines. See:
 Do not include secrets, kubeconfig credentials, tokens, or sensitive cluster data in issues or pull requests.
 
 If you discover a security-sensitive problem, report it privately through the repository owner instead of posting full exploit details publicly.
+
+## Regression tests
+
+Every bug fix must include a new or updated test that would fail before the fix and pass after. You can refer to existing test files for examples, such as [`tests/test_retries.py`](tests/test_retries.py).
+
+Before submitting your pull request, run the local check command to ensure all linters and tests pass:
+
+```bash
+.venv/bin/ruff check src tests && .venv/bin/mypy src && .venv/bin/python -m pytest tests
