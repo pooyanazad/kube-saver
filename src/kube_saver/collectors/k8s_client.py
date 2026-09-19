@@ -295,8 +295,11 @@ class K8sClient:
                 retry_config=self.retries,
             )
             version = getattr(version_info, "git_version", None) or "unknown"
-        except Exception as exc:
-            logger.warning("Cannot fetch cluster version after retries: %s", exc)
+        except ApiException as exc:
+            logger.warning("Cannot fetch cluster version: %s", _reason(exc))
+            version = "unknown"
+        except (TimeoutError, ConnectionError) as exc:
+            logger.warning("Cluster version request failed: %s", _reason(exc))
             version = "unknown"
 
         try:
