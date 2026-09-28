@@ -544,6 +544,35 @@ class TestRecommendationEngine:
         namespaces_hit = {r.target_namespace for r in recs}
         assert len(namespaces_hit) == 2
 
+    def test_consolidates_replicas_with_the_conservative_value(self) -> None:
+        quiet = _make_pod_waste("api", cpu_req=1000, cpu_act=50)
+        busy = _make_pod_waste("api", cpu_req=1000, cpu_act=200)
+
+        recs = generate_recommendations(
+            _make_report([quiet, busy]),
+            PricingEngine(provider=CloudProvider.AWS),
+        )
+
+        cpu_recs = [rec for rec in recs if rec.resource_type == "cpu-request"]
+        assert len(cpu_recs) == 1
+        assert cpu_recs[0].suggested_value == "300m"
+        assert "across 2 replicas" in cpu_recs[0].reason
+
+    def test_omits_recommendations_that_are_already_at_the_floor(self) -> None:
+        pw = _make_pod_waste(
+            cpu_req=50,
+            cpu_act=0,
+            mem_req=64 * 1024**2,
+            mem_act=0,
+        )
+
+        recs = generate_recommendations(
+            _make_report([pw]),
+            PricingEngine(provider=CloudProvider.AWS),
+        )
+
+        assert recs == []
+
     def test_skips_multi_container_pods_without_container_metrics(self) -> None:
         pw = _make_pod_waste(cpu_req=1000, cpu_act=50)
         pw.pod.containers.append(ContainerResourceInfo(name="sidecar"))

@@ -125,7 +125,11 @@ class TestEndToEndWorkflow:
 
         assert resource.total_pods == 1000
         assert cost.total_cost_waste.monthly_usd > 0
-        assert len(recs) >= 1000
+        assert len(recs) == 2
+        assert {rec.resource_type for rec in recs} == {
+            "cpu-request",
+            "memory-request",
+        }
 
     def test_long_running_stability_repeated_analysis(self) -> None:
         namespaces = [NamespaceInfo(name="default")]
