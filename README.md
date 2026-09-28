@@ -33,7 +33,7 @@ Turns invisible cluster waste into visible dollar amounts you can act on in one 
 - **Self-contained HTML report**, open in any browser, email as-is, no CDN
 - **Local PR plans**, review and apply right-sizing changes without touching a cloud API
 - **Markdown spike alerts**, daily summaries written to local files, no webhook needed
-- **Three runtime sources**: eBPF → metrics-server → safe estimates
+- **Two safe runtime modes**: metrics-server usage → request-based estimates
 
 ---
 

@@ -1,9 +1,8 @@
 """Unified runtime collector for Phase 4.
 
-Implements the fallback chain:
-    1. eBPF (best accuracy)
-    2. metrics-server
-    3. estimated zero-usage data
+Implements the runtime source chain. The eBPF integration currently performs
+capability detection only and always falls through to metrics-server, then to
+estimated request-based data when metrics-server is unavailable.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ class RuntimeCollectionResult:
 
 
 class RuntimeCollector:
-    """Runtime collector with eBPF-first fallback behavior."""
+    """Runtime collector with safe source fallback behavior."""
 
     def __init__(
         self,

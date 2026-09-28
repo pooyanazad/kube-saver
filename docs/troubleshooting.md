@@ -6,7 +6,7 @@ Common issues and how to fix them. If something is missing here, open an issue.
 
 ## TUI opens but all values show as estimates
 
-**Cause:** Neither eBPF nor metrics-server is available, so kube-saver fell back to request-based estimates.
+**Cause:** metrics-server is unavailable, so kube-saver fell back to request-based estimates.
 
 **What to do:**
 
@@ -26,26 +26,9 @@ Falling back to estimates is not an error, kube-saver is still working. The TUI 
 
 ## eBPF is not being used
 
-**Cause:** BCC bindings are not installed, or the process does not have the required kernel capabilities.
-
-**What to do:**
-
-- Install BCC:
-  ```bash
-  pip install "kube-saver[ebpf]"
-  ```
-  This requires `bcc-tools` and kernel headers on the host.
-- Run with root or the required capabilities:
-  ```bash
-  sudo kube-saver
-  ```
-- Check that `tracefs` and `debugfs` are mounted:
-  ```bash
-  mount | grep -E "tracefs|debugfs"
-  ```
-- If running inside a container, the container needs `privileged: true` or explicit `SYS_ADMIN` / `SYS_PTRACE` capabilities, plus the host's `/sys/kernel/debug` and `/sys/kernel/tracing` mounted.
-
-If eBPF is not available, kube-saver falls back to metrics-server automatically. This is safe and expected.
+Live eBPF probes are not implemented in this release. The eBPF module only
+reports host capabilities and always falls through to metrics-server. Installing
+BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 ---
 
@@ -120,7 +103,7 @@ If eBPF is not available, kube-saver falls back to metrics-server automatically.
 
 **What to do:**
 
-- Check which runtime source is active, estimates are less accurate than metrics-server or eBPF.
+- Check which runtime source is active; estimates are less accurate than metrics-server.
 - If a workload is intentionally bursty, annotate it with `kube-saver.io/ignore: "true"` to exclude it from recommendations.
 - Adjust the headroom buffer in config if your workloads need more or less margin:
   ```yaml
@@ -135,7 +118,6 @@ If eBPF is not available, kube-saver falls back to metrics-server automatically.
 **Cause:** This means kube-saver detected zero runtime usage for every pod. This happens when:
 
 - metrics-server is not running, AND
-- eBPF is not available, AND
 - the cluster has no pods making requests above the minimum floor
 
 **What to do:**

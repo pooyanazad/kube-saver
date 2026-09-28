@@ -8,8 +8,7 @@ A short overview of how kube-saver collects data, computes waste, and produces o
 
 ```
 Kubernetes API ─┐
-metrics-server  ─┤──> Collectors ──> Analyzers ──> Pricing engine
-eBPF (optional) ─┘         │              │              │
+metrics-server  ─┴──> Collectors ──> Analyzers ──> Pricing engine
                            ▼              ▼              ▼
                       ┌──────────────────────────────────────┐
                       │         Cost + waste snapshot         │
@@ -20,8 +19,9 @@ eBPF (optional) ─┘         │              │              │
 
 1. **Collectors** query the Kubernetes API for pods, nodes, and resource requests.
    If metrics-server is available they collect runtime usage.
-   If eBPF is available they collect per-pod CPU usage from the kernel.
-   If neither is available they fall back to safe estimates based on requests.
+   If metrics-server is unavailable they fall back to estimates based on
+   requests. eBPF capability detection exists, but live probes are not yet
+   implemented and never supply usage values.
 2. **Analyzers** compute waste (requested minus used), cluster health, and namespace efficiency.
 3. **Pricing engine** converts waste into monthly and yearly dollar amounts using your configured pricing model.
 4. **Recommendation engine** proposes right-sizing suggestions with safety guards (see [Safety & trust](safety.md)).
@@ -35,11 +35,10 @@ kube-saver uses the first available source in this order:
 
 | Priority | Source | Accuracy | Requires |
 |---|---|---|---|
-| 1 | eBPF | Per-container CPU, kernel-level | BCC bindings + root + host kernel |
-| 2 | metrics-server | Cluster-aggregated usage | metrics-server running |
-| 3 | Estimates | Request-based only | Nothing extra |
+| 1 | metrics-server | Cluster-aggregated usage | metrics-server running |
+| 2 | Estimates | Request-based only | Nothing extra |
 
-The source is shown in the TUI status bar and in every generated report.
+The source is shown in the TUI status bar.
 Falling back is **not an error**, it is by design. kube-saver degrades gracefully instead of crashing.
 
 ---

@@ -41,7 +41,7 @@ k9s is an outstanding cluster navigator. kube-saver does not replace it. They co
 | **Dollar cost** | Yes | No |
 | **Outputs** | HTML report, PR plan, TUI, alerts, JSON, Prometheus | Dashboard, VPA objects |
 | **Offline** | Fully offline | Fully offline |
-| **Data source** | eBPF → metrics-server → estimates | VPA recommender |
+| **Data source** | metrics-server → estimates | VPA recommender |
 
 Goldilocks is a good right-sizing tool. kube-saver gives you the same recommendations **plus** dollar amounts, a self-contained report, and a PR plan you can drop into a CI pipeline.
 

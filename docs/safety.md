@@ -112,11 +112,12 @@ kube-saver displays which runtime source it is using in every view. The accuracy
 
 | Source | Accuracy | When you get it |
 |---|---|---|
-| eBPF | Highest, kernel-level, per-container CPU | BCC installed, root, host kernel access |
 | metrics-server | Good, cluster-aggregated CPU/memory | metrics-server running |
-| Estimates | Conservative, request-based only | Neither of the above available |
+| Estimates | Request-based, not measured usage | metrics-server unavailable |
 
-Falling back to estimates is not a bug. The TUI and reports always tell you which source is active so you can judge how much to trust the numbers.
+Falling back to estimates is not a bug. The TUI shows which source is active,
+and estimated samples never produce right-sizing recommendations. eBPF live
+collection is not implemented in this release.
 
 ---
 

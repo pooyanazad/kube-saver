@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 from kube_saver.collectors.ebpf import EbpfCollector
-from kube_saver.collectors.ebpf_safety import check_ebpf_safety
+from kube_saver.collectors.ebpf_safety import EbpfSafetyReport, check_ebpf_safety
 from kube_saver.collectors.metrics import MetricSample
 from kube_saver.collectors.runtime import RuntimeCollector
 from kube_saver.models.core import (
@@ -41,6 +41,23 @@ def test_ebpf_collector_returns_structured_result() -> None:
     assert isinstance(result.warnings, list)
     if not result.supported:
         assert result.available is False
+
+
+def test_ebpf_capable_host_still_falls_back_until_probes_exist() -> None:
+    collector = EbpfCollector()
+    collector.safety = EbpfSafetyReport(
+        supported=True,
+        kernel_ok=True,
+        bcc_available=True,
+        running_as_root=True,
+    )
+
+    result = collector.collect_all_pods([_pod()])
+
+    assert result.supported is False
+    assert result.available is False
+    assert result.metrics == {}
+    assert any("not implemented" in warning for warning in result.warnings)
 
 
 def test_metric_sample_captures_collection_timestamp() -> None:
@@ -109,6 +126,25 @@ def test_runtime_collector_falls_back_cleanly() -> None:
     assert result.source in {MetricSource.EBPF, MetricSource.METRICS_SERVER, MetricSource.ESTIMATED}
     assert isinstance(result.advanced_metrics, dict)
     assert len(result.advanced_metrics) == 1
+
+
+def test_runtime_uses_metrics_when_host_is_ebpf_capable() -> None:
+    collector = RuntimeCollector(prefer_ebpf=True)
+    collector.ebpf.safety = EbpfSafetyReport(
+        supported=True,
+        kernel_ok=True,
+        bcc_available=True,
+        running_as_root=True,
+    )
+    pod = _pod()
+    pod.actual.observed_at = datetime.now()
+    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.available = True
+
+    result = collector.collect_all_pods([pod])
+
+    assert result.source is MetricSource.METRICS_SERVER
+    assert result.metrics_available is True
 
 
 def test_runtime_collector_builds_metric_key() -> None:

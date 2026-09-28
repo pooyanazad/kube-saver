@@ -1,9 +1,8 @@
-"""Phase 4 eBPF collector.
+"""Safety-aware placeholder for a future eBPF collector.
 
-Current implementation focuses on the integration contract and safety-aware
-fallback behavior. When BCC/eBPF tooling is available, this module can be
-extended to attach live probes. In environments without BCC, it reports why
-and gracefully falls back to the metrics-server collector.
+Capability detection is implemented, but live probes are not. This collector
+therefore always reports itself unavailable so callers continue to the real
+metrics-server source instead of mistaking default values for eBPF samples.
 """
 
 from __future__ import annotations
@@ -32,20 +31,14 @@ class EbpfCollectionResult:
 
 
 class EbpfCollector:
-    """Safety-aware eBPF collector.
-
-    Today this acts as a real capability gate and API surface. If the host is
-    ready for eBPF, this collector can be extended to attach probes. If not,
-    callers receive a structured report and can fall back to metrics-server or
-    estimated data.
-    """
+    """Capability gate that safely falls through until probes are implemented."""
 
     def __init__(self) -> None:
         self.safety = check_ebpf_safety()
 
     def collect_all_pods(self, pods: list[PodResourceInfo]) -> EbpfCollectionResult:
         """Attempt to collect advanced runtime data for pods."""
-        result = EbpfCollectionResult(safety=self.safety, supported=self.safety.supported)
+        result = EbpfCollectionResult(safety=self.safety, supported=False)
 
         if not self.safety.supported:
             result.warnings.extend(self.safety.reasons)
@@ -53,19 +46,10 @@ class EbpfCollector:
             logger.info("eBPF collection unavailable: %s", self.safety.summary)
             return result
 
-        # Placeholder for future BCC/eBPF probe integration.
-        # The shape of the return data is finalized here so the rest of the app
-        # can consume eBPF data without code churn.
-        for pod in pods:
-            result.metrics[f"{pod.namespace}/{pod.name}"] = AdvancedRuntimeMetrics(
-                pod_name=pod.name,
-                namespace=pod.namespace,
-                cpu_millicores=pod.actual.cpu_millicores,
-                source=MetricSource.EBPF.value,
-            )
-
-        if not result.metrics:
-            result.warnings.append("eBPF supported but no pod metrics were collected")
+        result.warnings.extend(self.safety.warnings)
+        result.warnings.append(
+            "eBPF probes are not implemented; using metrics-server when available"
+        )
         return result
 
 

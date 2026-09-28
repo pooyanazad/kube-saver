@@ -21,13 +21,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Optional eBPF support, gives the most accurate runtime data, but requires BCC bindings and host kernel capabilities:
-
-```bash
-pip install "kube-saver[ebpf]"
-```
-
-If eBPF is unavailable, kube-saver falls back automatically to metrics-server, then to safe estimates. You will see which source is being used in the TUI status bar and in every report.
+Install metrics-server in the cluster for measured CPU and memory usage. Without
+it, kube-saver shows request-based estimates and does not generate actionable
+right-sizing recommendations. eBPF capability detection is experimental; live
+eBPF probes are not implemented in this release.
 
 ---
 

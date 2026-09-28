@@ -56,7 +56,7 @@ tested.
 | ---------------------------------------- | ---------------------------- |
 | Kubernetes API server (read-only)        | yes                          |
 | `metrics-server` (for actual usage)      | yes, required for real numbers |
-| eBPF runtime data (KubeScape-style)      | optional, improves accuracy  |
+| eBPF runtime data                        | capability detection only; no live probes |
 | CRDs (any kind)                          | yes, kube-saver is read-only  |
 | Server-side apply                        | not used                      |
 
@@ -107,9 +107,11 @@ kube-saver picks the best available source automatically.
 
 | Source          | When used                            | Accuracy      |
 | --------------- | ------------------------------------ | ------------- |
-| eBPF            | if available and supported by kernel | highest       |
-| metrics-server  | if eBPF is not available             | high          |
+| metrics-server  | when the Metrics API is available     | high          |
 | Estimates only  | if no metrics-server                 | rough, based on requests, not usage |
+
+The eBPF module currently detects host capabilities but deliberately reports no
+metrics. This prevents placeholder values from being mistaken for observations.
 
 ## How to verify your environment
 
