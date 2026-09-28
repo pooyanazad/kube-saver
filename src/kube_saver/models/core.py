@@ -13,7 +13,7 @@ Units:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -176,7 +176,9 @@ class ActualUsage:
     cpu_millicores: float = 0.0
     memory_bytes: int = 0
     source: MetricSource = MetricSource.ESTIMATED
-    observed_at: datetime = field(default_factory=datetime.now)
+    observed_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
     sample_count: int = 1
 
 

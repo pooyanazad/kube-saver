@@ -8,7 +8,7 @@ estimated request-based data when metrics-server is unavailable.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.metrics import MetricsCollector
@@ -56,7 +56,10 @@ class RuntimeCollector:
 
     def collect_all_pods(self, pods: list[PodResourceInfo]) -> RuntimeCollectionResult:
         result = RuntimeCollectionResult()
-        now = datetime.now()
+        # metrics-server timestamps are UTC. Keep the internal naive datetime
+        # convention, but derive "now" from UTC as well so local timezone
+        # offsets cannot make fresh samples appear hours old.
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if self.prefer_ebpf:
             ebpf_result = self.ebpf.collect_all_pods(pods)

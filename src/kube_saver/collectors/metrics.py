@@ -124,7 +124,7 @@ class MetricsCollector:
         self.source = MetricSource.METRICS_SERVER
         pod_map = {pod.name: pod for pod in pods}
         result: dict[str, ActualUsage] = {}
-        now = datetime.now()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         for item in metrics.get("items", []):
             pod_name = item.get("metadata", {}).get("name", "")
             if pod_name not in pod_map:

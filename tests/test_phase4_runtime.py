@@ -1,7 +1,8 @@
 """Tests for Phase 4 runtime collection and eBPF fallback."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
+from kube_saver.collectors import runtime as runtime_module
 from kube_saver.collectors.ebpf import EbpfCollector
 from kube_saver.collectors.ebpf_safety import EbpfSafetyReport, check_ebpf_safety
 from kube_saver.collectors.metrics import MetricSample
@@ -26,6 +27,10 @@ def _pod(name: str = "demo", namespace: str = "default") -> PodResourceInfo:
         ),
         actual=ActualUsage(cpu_millicores=25, memory_bytes=32 * 1024**2, source=MetricSource.METRICS_SERVER),
     )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def test_ebpf_safety_report_has_summary() -> None:
@@ -69,7 +74,7 @@ def test_metric_sample_captures_collection_timestamp() -> None:
 def test_runtime_collector_marks_stale_metrics_unavailable() -> None:
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     pod = _pod()
-    pod.actual.observed_at = datetime.now() - timedelta(seconds=61)
+    pod.actual.observed_at = _utc_now() - timedelta(seconds=61)
     collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
     collector.metrics.available = True
 
@@ -86,7 +91,7 @@ def test_runtime_collector_marks_stale_metrics_unavailable() -> None:
 def test_runtime_collector_accepts_fresh_metrics() -> None:
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     pod = _pod()
-    pod.actual.observed_at = datetime.now()
+    pod.actual.observed_at = _utc_now()
     collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
     collector.metrics.available = True
 
@@ -98,12 +103,33 @@ def test_runtime_collector_accepts_fresh_metrics() -> None:
     assert pod.actual.source is MetricSource.METRICS_SERVER
 
 
+def test_runtime_compares_metric_age_in_utc(monkeypatch) -> None:
+    class OffsetClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is timezone.utc:
+                return cls(2026, 1, 1, tzinfo=timezone.utc)
+            return cls(2026, 1, 1, 2, 0, 0)
+
+    monkeypatch.setattr(runtime_module, "datetime", OffsetClock)
+    collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
+    pod = _pod()
+    pod.actual.observed_at = datetime(2026, 1, 1)
+    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.available = True
+
+    result = collector.collect_all_pods([pod])
+
+    assert result.source is MetricSource.METRICS_SERVER
+    assert result.metrics_available is True
+
+
 def test_runtime_collector_marks_only_missing_pods_unavailable() -> None:
     """Pods missing from the metrics response drop to estimated, others stay real."""
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     fresh_pod = _pod(name="fresh-pod")
     missing_pod = _pod(name="missing-pod")
-    fresh_pod.actual.observed_at = datetime.now()
+    fresh_pod.actual.observed_at = _utc_now()
     collector.metrics.collect_all_pods = lambda pods: {fresh_pod.name: fresh_pod.actual}
     collector.metrics.available = True
 
@@ -137,7 +163,7 @@ def test_runtime_uses_metrics_when_host_is_ebpf_capable() -> None:
         running_as_root=True,
     )
     pod = _pod()
-    pod.actual.observed_at = datetime.now()
+    pod.actual.observed_at = _utc_now()
     collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
     collector.metrics.available = True
 
