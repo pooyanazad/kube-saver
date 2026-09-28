@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from kube_saver.analyzers.resource_waste import PodWaste, ResourceWasteReport
-from kube_saver.models.core import Recommendation
+from kube_saver.models.core import MetricSource, Recommendation
 from kube_saver.pricing.engine import PricingEngine
 
 if TYPE_CHECKING:
@@ -41,6 +41,12 @@ def generate_recommendations(
             continue
 
         for pod_waste in ns.pod_waste:
+            # Estimated samples represent missing telemetry, not observed zero
+            # usage. They are useful for showing requested capacity, but must
+            # never drive an actionable right-sizing recommendation.
+            if pod_waste.pod.actual.source is MetricSource.ESTIMATED:
+                continue
+
             # Pod-level exclusion via labels/annotations
             if config and config.is_pod_excluded(
                 pod_waste.pod.name,

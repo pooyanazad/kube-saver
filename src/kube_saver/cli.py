@@ -25,6 +25,7 @@ from kube_saver.analyzers.resource_waste import (
     analyze_resource_waste,
 )
 from kube_saver.collectors.k8s_client import K8sClient
+from kube_saver.collectors.runtime import RuntimeCollector
 from kube_saver.models.core import Recommendation, ScanResult
 from kube_saver.pricing.engine import PricingEngine
 from kube_saver.recommenders.engine import generate_recommendations
@@ -43,14 +44,38 @@ def _run_analysis() -> tuple[
     """
     from kube_saver.config import load_config
     config = load_config()
-    client = K8sClient(timeouts=config.timeouts, retries=config.retries)
+    client = K8sClient(
+        context=config.kubeconfig_context,
+        namespace_filter=config.namespace_filter or None,
+        exclude_namespaces=config.exclude_namespaces,
+        timeouts=config.timeouts,
+        retries=config.retries,
+    )
     client.connect()
     scan = client.get_all_pods()
     pods = scan.pods
     namespaces = client.get_namespaces()
 
-    resource_report = analyze_resource_waste(namespaces, pods, metrics_available=True)
-    pricing = PricingEngine()
+    runtime = RuntimeCollector(
+        prefer_ebpf=True,
+        max_metric_age_seconds=config.runtime.max_metric_age_seconds,
+    )
+    runtime_result = runtime.collect_all_pods(pods)
+
+    resource_report = analyze_resource_waste(
+        namespaces,
+        pods,
+        metrics_available=runtime_result.metrics_available,
+    )
+    pricing = PricingEngine(
+        provider=config.cloud_provider,
+        tier=config.provider_tier,
+    )
+    if config.pricing_has_custom_rates():
+        pricing.set_rate(
+            cpu_per_core_hour=config.pricing.cpu_per_core_hour_usd,
+            memory_per_gb_hour=config.pricing.memory_per_gb_hour_usd,
+        )
     cost_report = analyze_cost_waste(resource_report, pricing)
     recs = generate_recommendations(resource_report, pricing, config=config)
     return resource_report, cost_report, recs, scan
