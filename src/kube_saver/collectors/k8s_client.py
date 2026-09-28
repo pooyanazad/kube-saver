@@ -161,7 +161,8 @@ class K8sClient:
 
         Raises:
             RuntimeError: If the ``kubernetes`` package is not installed.
-            FileNotFoundError: If no kubeconfig file exists.
+            FileNotFoundError: If an explicit kubeconfig or context was
+                requested but no kubeconfig file exists.
             kubernetes.config.config_exception.ConfigException:
                 If the kubeconfig cannot be parsed, or the requested context
                 does not exist in the kubeconfig file.
@@ -172,16 +173,25 @@ class K8sClient:
                 "Install it with: pip install kube-saver"
             )
 
-        # ── Validate kubeconfig file exists ───────────────────────────────
+        # ── Select kubeconfig or in-cluster authentication ────────────────
         kubeconfig_path = self._resolve_kubeconfig_path()
-        if kubeconfig_path and not Path(kubeconfig_path).exists():
+        kubeconfig_exists = bool(
+            kubeconfig_path and Path(kubeconfig_path).exists()
+        )
+        explicit_kubeconfig = bool(os.environ.get("KUBECONFIG"))
+        if explicit_kubeconfig and not kubeconfig_exists:
             raise FileNotFoundError(
                 f"Kubeconfig not found at {kubeconfig_path}. "
+                "Check the paths listed in KUBECONFIG"
+            )
+        if self.context and not kubeconfig_exists:
+            raise FileNotFoundError(
+                f"Cannot select context '{self.context}' without a kubeconfig. "
                 "Set KUBECONFIG or place a config at ~/.kube/config"
             )
 
         # ── Validate requested context exists ─────────────────────────────
-        if self.context:
+        if self.context and kubeconfig_exists:
             try:
                 contexts, current = k8s_config.list_kube_config_contexts(
                     config_file=kubeconfig_path
@@ -198,11 +208,9 @@ class K8sClient:
                     )
 
         # ── Load config and build clients ─────────────────────────────────
-        try:
+        if kubeconfig_exists:
             k8s_config.load_kube_config(context=self.context or None)
-        except k8s_config.ConfigException:
-            if self.context:
-                raise
+        else:
             k8s_config.load_incluster_config()
         self._core_api = k8s_client.CoreV1Api()
         self._apps_api = k8s_client.AppsV1Api()
@@ -250,7 +258,8 @@ class K8sClient:
         """Find the kubeconfig file that would be used."""
         explicit = os.environ.get("KUBECONFIG")
         if explicit:
-            return explicit.split(os.pathsep)[0] if explicit else None
+            paths = [part for part in explicit.split(os.pathsep) if part]
+            return next((path for path in paths if Path(path).exists()), paths[0] if paths else None)
         return str(Path.home() / ".kube" / "config")
 
     @property

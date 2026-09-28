@@ -60,12 +60,27 @@ class TestParseMemory:
 class TestK8sClientConnect:
     """Verify that K8sClient.connect() fails fast with clear messages."""
 
-    def test_connect_missing_kubeconfig(self, monkeypatch, tmp_path) -> None:
-        """FileNotFoundError when kubeconfig file does not exist."""
-        from kube_saver.collectors.k8s_client import K8sClient
-
+    def test_connect_without_kubeconfig_uses_incluster(self, monkeypatch, tmp_path) -> None:
         monkeypatch.delenv("KUBECONFIG", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        from kube_saver.collectors import k8s_client as kmod
+
+        fake_client = MagicMock()
+        fake_config = MagicMock()
+        monkeypatch.setattr(kmod, "_K8S_AVAILABLE", True)
+        monkeypatch.setattr(kmod, "k8s_client", fake_client)
+        monkeypatch.setattr(kmod, "k8s_config", fake_config)
+
+        client = K8sClient()
+        client.connect()
+
+        fake_config.load_incluster_config.assert_called_once_with()
+        fake_config.load_kube_config.assert_not_called()
+
+    def test_connect_with_missing_explicit_kubeconfig_fails(self, monkeypatch, tmp_path) -> None:
+        missing = tmp_path / "missing"
+        monkeypatch.setenv("KUBECONFIG", str(missing))
 
         client = K8sClient()
         with pytest.raises(FileNotFoundError, match="Kubeconfig not found"):

@@ -209,7 +209,11 @@ def run_doctor(
     op_timeout = timeouts.operation_seconds
 
     # ── Check 1: kubeconfig file ──────────────────────────────────────────
-    if report.kubeconfig_path and Path(report.kubeconfig_path).exists():
+    kubeconfig_exists = bool(
+        report.kubeconfig_path and Path(report.kubeconfig_path).exists()
+    )
+    explicit_kubeconfig = bool(os.environ.get("KUBECONFIG"))
+    if kubeconfig_exists:
         report.checks.append(
             CheckResult(
                 name="kubeconfig",
@@ -217,7 +221,7 @@ def run_doctor(
                 detail=f"found at {report.kubeconfig_path}",
             )
         )
-    else:
+    elif explicit_kubeconfig or context:
         report.checks.append(
             CheckResult(
                 name="kubeconfig",
@@ -245,63 +249,81 @@ def run_doctor(
     assert k8s_config is not None
 
     try:
-        if context:
+        if kubeconfig_exists and context:
             k8s_config.load_kube_config(context=context)
+        elif kubeconfig_exists:
+            k8s_config.load_kube_config(
+                config_file=report.kubeconfig_path,
+                context=None,
+            )
         else:
-            # Prefer explicit kubeconfig if we resolved one ourselves.
-            try:
-                k8s_config.load_kube_config(
-                    config_file=report.kubeconfig_path,
-                    context=None,
+            k8s_config.load_incluster_config()
+            report.checks.append(
+                CheckResult(
+                    name="kubeconfig",
+                    ok=True,
+                    detail="using in-cluster service account",
                 )
-            except k8s_config.ConfigException:
-                # In-cluster fallback (will only work if running inside a pod).
-                k8s_config.load_incluster_config()
+            )
     except k8s_config.ConfigException as exc:
         report.checks.append(
             CheckResult(
-                name="kubeconfig parses",
+                name="kubeconfig" if not kubeconfig_exists else "kubeconfig parses",
                 ok=False,
                 detail=str(exc),
-                hint="verify the file syntax with `kubectl config view`",
+                hint=(
+                    "verify the pod has a mounted service account token"
+                    if not kubeconfig_exists
+                    else "verify the file syntax with `kubectl config view`"
+                ),
             )
         )
         return report
 
     # ── Check 3: active context resolves ──────────────────────────────────
-    try:
-        active = k8s_config.list_kube_config_contexts(config_file=report.kubeconfig_path)
-        contexts = [c.get("name") for c in (active[0] if active else [])]
-        current = active[1] if len(active) > 1 else None
-        current_name = current.get("name") if current else None
-        if context and context not in contexts:
-            report.checks.append(
-                CheckResult(
-                    name="context",
-                    ok=False,
-                    detail=f"context '{context}' not in kubeconfig",
-                    hint=f"available contexts: {', '.join(contexts) or '(none)'}",
-                )
-            )
-            return report
-        report.context = current_name or context or "default"
+    if not kubeconfig_exists:
+        report.context = "in-cluster"
         report.checks.append(
             CheckResult(
                 name="context",
                 ok=True,
-                detail=f"active context is '{report.context}'",
+                detail="using in-cluster service account",
             )
         )
-    except Exception as exc:  # noqa: BLE001
-        report.checks.append(
-            CheckResult(
-                name="context",
-                ok=False,
-                detail=f"could not list contexts: {exc}",
-                hint="run `kubectl config get-contexts` to inspect your kubeconfig",
+    else:
+        try:
+            active = k8s_config.list_kube_config_contexts(config_file=report.kubeconfig_path)
+            contexts = [c.get("name") for c in (active[0] if active else [])]
+            current = active[1] if len(active) > 1 else None
+            current_name = current.get("name") if current else None
+            if context and context not in contexts:
+                report.checks.append(
+                    CheckResult(
+                        name="context",
+                        ok=False,
+                        detail=f"context '{context}' not in kubeconfig",
+                        hint=f"available contexts: {', '.join(contexts) or '(none)'}",
+                    )
+                )
+                return report
+            report.context = current_name or context or "default"
+            report.checks.append(
+                CheckResult(
+                    name="context",
+                    ok=True,
+                    detail=f"active context is '{report.context}'",
+                )
             )
-        )
-        return report
+        except Exception as exc:  # noqa: BLE001
+            report.checks.append(
+                CheckResult(
+                    name="context",
+                    ok=False,
+                    detail=f"could not list contexts: {exc}",
+                    hint="run `kubectl config get-contexts` to inspect your kubeconfig",
+                )
+            )
+            return report
 
     # ── Check 4: cluster reachability ─────────────────────────────────────
     assert api_exception is not None

@@ -211,6 +211,20 @@ class TestRunDoctorFailures:
 
 
 class TestRunDoctorSuccess:
+    def test_incluster_auth_without_kubeconfig(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv("KUBECONFIG", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        fakes = _install_fake_kubernetes(monkeypatch)
+
+        report = run_doctor()
+
+        assert report.ok
+        assert report.context == "in-cluster"
+        fakes["config"].load_incluster_config.assert_called_once_with()
+        fakes["config"].load_kube_config.assert_not_called()
+
     def test_all_checks_pass(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         cfg = tmp_path / "config"
         cfg.write_text("apiVersion: v1\n")
