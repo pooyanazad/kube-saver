@@ -23,6 +23,7 @@ from kube_saver.models.core import (
     ActualUsage,
     CloudProvider,
     ClusterInfo,
+    ContainerResourceInfo,
     CostInfo,
     Currency,
     MetricSource,
@@ -433,6 +434,7 @@ def _make_pod_waste(
         namespace=ns,
         workload_kind=kind,
         workload_name=name,
+        containers=[ContainerResourceInfo(name="app")],
         resources=ResourceQuantities(
             cpu_millicores_request=cpu_req,
             memory_bytes_request=mem_req,
@@ -541,3 +543,14 @@ class TestRecommendationEngine:
         recs = generate_recommendations(report, pricing)
         namespaces_hit = {r.target_namespace for r in recs}
         assert len(namespaces_hit) == 2
+
+    def test_skips_multi_container_pods_without_container_metrics(self) -> None:
+        pw = _make_pod_waste(cpu_req=1000, cpu_act=50)
+        pw.pod.containers.append(ContainerResourceInfo(name="sidecar"))
+
+        recs = generate_recommendations(
+            _make_report([pw]),
+            PricingEngine(provider=CloudProvider.AWS),
+        )
+
+        assert recs == []

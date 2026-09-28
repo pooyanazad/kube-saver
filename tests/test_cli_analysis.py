@@ -8,6 +8,7 @@ from kube_saver import cli as cli_mod
 from kube_saver.config import KubeSaverConfig
 from kube_saver.models.core import (
     ActualUsage,
+    ContainerResourceInfo,
     MetricSource,
     NamespaceInfo,
     PodResourceInfo,
@@ -22,6 +23,7 @@ def _pod() -> PodResourceInfo:
         namespace="prod",
         workload_kind="Deployment",
         workload_name="api",
+        containers=[ContainerResourceInfo(name="api")],
         resources=ResourceQuantities(
             cpu_millicores_request=1000,
             memory_bytes_request=1024**3,

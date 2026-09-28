@@ -11,6 +11,7 @@ from kube_saver.config import AlertConfig
 from kube_saver.models.core import (
     ActualUsage,
     CloudProvider,
+    ContainerResourceInfo,
     MetricSource,
     NamespaceInfo,
     PodResourceInfo,
@@ -48,6 +49,7 @@ def _pod(name: str, namespace: str, cpu_req: float, cpu_act: float, mem_req_mi: 
         namespace=namespace,
         workload_kind="Deployment",
         workload_name=name.split("-")[0],
+        containers=[ContainerResourceInfo(name="app")],
         resources=ResourceQuantities(
             cpu_millicores_request=cpu_req,
             memory_bytes_request=mem_req_mi * 1024**2,

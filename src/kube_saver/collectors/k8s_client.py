@@ -150,6 +150,11 @@ class K8sClient:
     _core_api: object = field(default=None, init=False, repr=False)
     _apps_api: object = field(default=None, init=False, repr=False)
     _connected: bool = field(default=False, init=False, repr=False)
+    _replicaset_owner_cache: dict[tuple[str, str], tuple[str, str]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
 
     def connect(self) -> None:
         """Load kubeconfig and build API clients.
@@ -412,9 +417,11 @@ class K8sClient:
         results: list[PodResourceInfo] = []
         for pod in pods:
             pod_spec = pod.spec if pod.spec is not None else None
-            owner = pod.metadata.owner_references
-            workload_kind = owner[0].kind if owner else "Pod"
-            workload_name = owner[0].name if owner else pod.metadata.name
+            workload_kind, workload_name = self._resolve_workload_owner(
+                namespace,
+                pod.metadata.owner_references,
+                pod.metadata.name,
+            )
 
             containers = pod_spec.containers if pod_spec is not None else None
             containers = containers or []
@@ -451,6 +458,67 @@ class K8sClient:
                 )
             )
         return results, None
+
+    def _resolve_workload_owner(
+        self,
+        namespace: str,
+        owner_references: list[object] | None,
+        pod_name: str,
+    ) -> tuple[str, str]:
+        """Resolve a pod's durable workload controller.
+
+        Deployment pods are directly owned by ReplicaSets. Patching that
+        ReplicaSet would be lost on the next rollout, so follow its owner to
+        the Deployment. If the lookup is unavailable, retain the immediate
+        owner; the PR-plan exporter will decline to emit an unsafe patch for
+        unsupported controller kinds.
+        """
+        owners = list(owner_references or [])
+        owner = next(
+            (ref for ref in owners if getattr(ref, "controller", False)),
+            owners[0] if owners else None,
+        )
+        if owner is None:
+            return "Pod", pod_name
+
+        kind = str(getattr(owner, "kind", "Pod"))
+        name = str(getattr(owner, "name", pod_name))
+        if kind != "ReplicaSet":
+            return kind, name
+
+        cache_key = (namespace, name)
+        if cache_key in self._replicaset_owner_cache:
+            return self._replicaset_owner_cache[cache_key]
+
+        resolved = (kind, name)
+        try:
+            replica_set = self.apps.read_namespaced_replica_set(
+                name,
+                namespace,
+                _request_timeout=self.timeouts.operation_seconds,
+            )
+            parent_refs = list(replica_set.metadata.owner_references or [])
+            parent = next(
+                (
+                    ref
+                    for ref in parent_refs
+                    if getattr(ref, "controller", False)
+                    and getattr(ref, "kind", "") == "Deployment"
+                ),
+                None,
+            )
+            if parent is not None:
+                resolved = ("Deployment", str(parent.name))
+        except (ApiException, TimeoutError, ConnectionError) as exc:
+            logger.warning(
+                "Cannot resolve ReplicaSet %s/%s owner: %s",
+                namespace,
+                name,
+                _reason(exc),
+            )
+
+        self._replicaset_owner_cache[cache_key] = resolved
+        return resolved
 
     def get_pods(self, namespace: str) -> list[PodResourceInfo]:
         """Fetch all pods in a namespace with their resource data.
@@ -529,6 +597,7 @@ class K8sClient:
         """Release any held API client resources."""
         self._core_api = None
         self._apps_api = None
+        self._replicaset_owner_cache.clear()
         self._connected = False
 
 

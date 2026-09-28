@@ -14,6 +14,8 @@ from pathlib import Path
 
 from kube_saver.models.core import Recommendation
 
+_PATCHABLE_WORKLOADS = {"Deployment", "StatefulSet", "DaemonSet"}
+
 
 @dataclass
 class PullRequestPlan:
@@ -63,17 +65,31 @@ def generate_pr_plan(
     ])
     body = "\n".join(lines)
 
-    # Build kubectl patch commands (one per workload)
+    # Build strategic merge patches (one per workload container). Kubernetes
+    # merges the containers list by name for these built-in workload kinds,
+    # preserving images, probes, sibling containers, and unrelated resources.
     patches: list[str] = ["#!/usr/bin/env bash", "# kube-saver generated patch commands", ""]
-    by_workload: dict[tuple[str, str, str], list[Recommendation]] = {}
+    by_target: dict[tuple[str, str, str, str], list[Recommendation]] = {}
     for rec in recommendations:
-        key = (rec.target_namespace, rec.target_kind, rec.target_name)
-        by_workload.setdefault(key, []).append(rec)
-    for (ns, kind, name), recs in by_workload.items():
-        patches.append(f"# {ns}/{kind}/{name}")
+        key = (
+            rec.target_namespace,
+            rec.target_kind,
+            rec.target_name,
+            rec.container_name,
+        )
+        by_target.setdefault(key, []).append(rec)
+    for (ns, kind, name, container_name), recs in by_target.items():
+        target = f"{ns}/{kind}/{name}"
+        if kind not in _PATCHABLE_WORKLOADS or not container_name:
+            patches.append(
+                f"# Skipped {target}: cannot safely patch this controller/container"
+            )
+            patches.append("")
+            continue
+
+        patches.append(f"# {target} container {container_name}")
         patches.append(f"kubectl patch {kind.lower()} {name} -n {ns} \\")
-        # Build JSON merge patch
-        container_patch: dict[str, object] = {}
+        container_patch: dict[str, object] = {"name": container_name}
         for rec in recs:
             res = container_patch.setdefault("resources", {})
             if not isinstance(res, dict):
@@ -91,7 +107,7 @@ def generate_pr_plan(
             {"spec": {"template": {"spec": {"containers": [container_patch]}}}},
             separators=(",", ":"),
         )
-        patches.append(f"  --type=merge -p \'{patch_json}\'")
+        patches.append(f"  --type=strategic -p \'{patch_json}\'")
         patches.append("")
 
     patch_text = "\n".join(patches)

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -116,3 +118,33 @@ class TestK8sClientConnect:
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         expected = str(tmp_path / ".kube" / "config")
         assert K8sClient._resolve_kubeconfig_path() == expected
+
+
+def test_resolves_replicaset_to_deployment_and_caches_result() -> None:
+    apps = MagicMock()
+    apps.read_namespaced_replica_set.return_value = SimpleNamespace(
+        metadata=SimpleNamespace(
+            owner_references=[
+                SimpleNamespace(
+                    kind="Deployment",
+                    name="api",
+                    controller=True,
+                )
+            ]
+        )
+    )
+    client = K8sClient()
+    client._apps_api = apps
+    client._connected = True
+    owner = SimpleNamespace(
+        kind="ReplicaSet",
+        name="api-7dcf8d",
+        controller=True,
+    )
+
+    first = client._resolve_workload_owner("prod", [owner], "api-7dcf8d-abc")
+    second = client._resolve_workload_owner("prod", [owner], "api-7dcf8d-def")
+
+    assert first == ("Deployment", "api")
+    assert second == first
+    apps.read_namespaced_replica_set.assert_called_once()

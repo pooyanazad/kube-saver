@@ -66,6 +66,13 @@ def generate_recommendations(
 
 def _recommend_for_pod(pw: PodWaste, pricing: PricingEngine) -> list[Recommendation]:
     pod = pw.pod
+    # Pod-level metrics cannot be divided safely among sidecars. Until
+    # container-level history is available, only recommend for pods whose
+    # complete usage belongs to one known container.
+    if len(pod.containers) != 1:
+        return []
+
+    container_name = pod.containers[0].name
     req = pod.resources
     act = pod.actual
     recs: list[Recommendation] = []
@@ -78,7 +85,7 @@ def _recommend_for_pod(pw: PodWaste, pricing: PricingEngine) -> list[Recommendat
                 target_kind=pod.workload_kind,
                 target_name=pod.workload_name,
                 target_namespace=pod.namespace,
-                container_name=pod.name,
+                container_name=container_name,
                 resource_type="cpu-request",
                 current_value=f"{int(req.cpu_millicores_request)}m",
                 suggested_value=f"{int(suggested_cpu)}m",
@@ -96,7 +103,7 @@ def _recommend_for_pod(pw: PodWaste, pricing: PricingEngine) -> list[Recommendat
                 target_kind=pod.workload_kind,
                 target_name=pod.workload_name,
                 target_namespace=pod.namespace,
-                container_name=pod.name,
+                container_name=container_name,
                 resource_type="memory-request",
                 current_value=_fmt_bytes(req.memory_bytes_request),
                 suggested_value=_fmt_bytes(suggested_mem),

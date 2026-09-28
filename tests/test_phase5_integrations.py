@@ -20,6 +20,7 @@ def _recommendations() -> list[Recommendation]:
             target_kind="Deployment",
             target_name="demo",
             target_namespace="default",
+            container_name="app",
             resource_type="cpu-request",
             current_value="500m",
             suggested_value="150m",
@@ -62,6 +63,20 @@ def test_generate_pr_plan_dry_run() -> None:
     assert plan.branch_name.startswith("kube-saver/")
     assert "summary.md" in plan.files
     assert "apply-patches.sh" in plan.files
+    patch = plan.files["apply-patches.sh"]
+    assert "--type=strategic" in patch
+    assert '"name":"app"' in patch
+    assert "--type=merge" not in patch
+
+
+def test_pr_plan_skips_ephemeral_replicaset_target() -> None:
+    recommendation = _recommendations()[0]
+    recommendation.target_kind = "ReplicaSet"
+
+    patch = generate_pr_plan([recommendation]).files["apply-patches.sh"]
+
+    assert "Skipped default/ReplicaSet/demo" in patch
+    assert "kubectl patch" not in patch
 
 
 def test_apply_plan_locally(tmp_path: Path) -> None:
