@@ -18,12 +18,19 @@ from kube_saver.config import RetryConfig, TimeoutConfig
 
 # ── Fake kubernetes fixture (shared with test_timeouts) ───────────────────
 
+# Set by ``_patch_api_exception_type`` so ``except ApiException`` clauses in
+# production code match the fakes. CPython's exception matching uses real
+# subclass checks, so a metaclass ``__instancecheck__`` is not enough here.
+_CURRENT_API_EXCEPTION_TYPE: type[Exception] = type(
+    "ApiException", (Exception,), {"status": None}
+)
+
 
 def _make_api_exception(status: int, reason: str | None = None) -> Exception:
     """Build an ApiException-like object carrying a status attribute."""
-    exc = Exception(f"http {status}: {reason or ''}")
-    exc.status = status
-    exc.reason = reason
+    exc = _CURRENT_API_EXCEPTION_TYPE(f"http {status}: {reason or ''}")
+    exc.status = status  # type: ignore[attr-defined]
+    exc.reason = reason  # type: ignore[attr-defined]
     return exc
 
 
@@ -110,28 +117,25 @@ def _build_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
 
 def _patch_api_exception_type(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make retry.is_transient recognise our fake ApiException instances.
+    """Make production ``except ApiException`` clauses catch our fakes.
 
-    The real kubernetes ApiException is a class; our fake exceptions are plain
-    ``Exception`` subclasses carrying a ``status`` attribute. We point the retry
-    module's ``ApiException`` at a type whose ``__instancecheck__`` matches
-    any object exposing a numeric ``status`` attribute.
+    The fakes carry the HTTP status on a real ``Exception`` subclass so both
+    ``retry.is_transient`` (``isinstance`` check) and the typed ``except``
+    handlers in ``k8s_client`` recognise them.
     """
 
-    class _ApiExceptionMeta(type):
-        def __instancecheck__(cls, instance: object) -> bool:
-            status = getattr(instance, "status", None)
-            try:
-                return status is not None and int(status)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
-                return False
+    class _ApiException(Exception):  # noqa: N818
+        status: int | None = None
+        reason: str | None = None
 
-    class _ApiException(metaclass=_ApiExceptionMeta):
-        pass
+    global _CURRENT_API_EXCEPTION_TYPE
+    _CURRENT_API_EXCEPTION_TYPE = _ApiException
 
+    from kube_saver.collectors import k8s_client as kmod
     from kube_saver.collectors import retry as rmod
 
     monkeypatch.setattr(rmod, "ApiException", _ApiException)
+    monkeypatch.setattr(kmod, "ApiException", _ApiException)
 
 
 # ── C2.4a: get_namespaces retries transient failures ─────────────────────
