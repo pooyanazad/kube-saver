@@ -157,13 +157,28 @@ class MetricsCollector:
         return result
 
     def collect_all_pods(self, pods: list[PodResourceInfo]) -> dict[str, ActualUsage]:
-        """Collect metrics across all namespaces for the given pods."""
+        """Collect metrics across all namespaces for the given pods.
+
+        Returns a map keyed by ``"namespace/pod_name"`` so identically named
+        pods in different namespaces cannot collide.
+
+        ``available`` reflects the *aggregate* outcome: True when at least
+        one namespace was read successfully. A failure in one namespace
+        therefore degrades only the pods of that namespace (they are simply
+        absent from the map) instead of blanking the whole scan.
+        """
         by_namespace: dict[str, list[PodResourceInfo]] = {}
         for pod in pods:
             by_namespace.setdefault(pod.namespace, []).append(pod)
         all_metrics: dict[str, ActualUsage] = {}
+        any_namespace_ok = False
         for namespace, namespace_pods in by_namespace.items():
-            all_metrics.update(self.collect_pod_metrics(namespace_pods, namespace))
+            namespace_metrics = self.collect_pod_metrics(namespace_pods, namespace)
+            if self.available:
+                any_namespace_ok = True
+            for pod_name, usage in namespace_metrics.items():
+                all_metrics[f"{namespace}/{pod_name}"] = usage
+        self.available = any_namespace_ok
         return all_metrics
 
     def calculate_utilization(

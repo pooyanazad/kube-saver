@@ -75,7 +75,7 @@ def test_runtime_collector_marks_stale_metrics_unavailable() -> None:
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     pod = _pod()
     pod.actual.observed_at = _utc_now() - timedelta(seconds=61)
-    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.collect_all_pods = lambda pods: {f"{pod.namespace}/{pod.name}": pod.actual}
     collector.metrics.available = True
 
     result = collector.collect_all_pods([pod])
@@ -92,7 +92,7 @@ def test_runtime_collector_accepts_fresh_metrics() -> None:
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     pod = _pod()
     pod.actual.observed_at = _utc_now()
-    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.collect_all_pods = lambda pods: {f"{pod.namespace}/{pod.name}": pod.actual}
     collector.metrics.available = True
 
     result = collector.collect_all_pods([pod])
@@ -115,7 +115,7 @@ def test_runtime_compares_metric_age_in_utc(monkeypatch) -> None:
     collector = RuntimeCollector(prefer_ebpf=False, max_metric_age_seconds=60)
     pod = _pod()
     pod.actual.observed_at = datetime(2026, 1, 1)
-    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.collect_all_pods = lambda pods: {f"{pod.namespace}/{pod.name}": pod.actual}
     collector.metrics.available = True
 
     result = collector.collect_all_pods([pod])
@@ -130,7 +130,7 @@ def test_runtime_collector_marks_only_missing_pods_unavailable() -> None:
     fresh_pod = _pod(name="fresh-pod")
     missing_pod = _pod(name="missing-pod")
     fresh_pod.actual.observed_at = _utc_now()
-    collector.metrics.collect_all_pods = lambda pods: {fresh_pod.name: fresh_pod.actual}
+    collector.metrics.collect_all_pods = lambda pods: {f"{fresh_pod.namespace}/{fresh_pod.name}": fresh_pod.actual}
     collector.metrics.available = True
 
     result = collector.collect_all_pods([fresh_pod, missing_pod])
@@ -145,7 +145,7 @@ def test_runtime_collector_marks_only_missing_pods_unavailable() -> None:
 
 def test_runtime_collector_falls_back_cleanly() -> None:
     collector = RuntimeCollector(prefer_ebpf=True)
-    collector.metrics.collect_all_pods = lambda pods: {p.name: p.actual for p in pods}
+    collector.metrics.collect_all_pods = lambda pods: {f"{p.namespace}/{p.name}": p.actual for p in pods}
     collector.metrics.available = True
     pods = [_pod()]
     result = collector.collect_all_pods(pods)
@@ -164,7 +164,7 @@ def test_runtime_uses_metrics_when_host_is_ebpf_capable() -> None:
     )
     pod = _pod()
     pod.actual.observed_at = _utc_now()
-    collector.metrics.collect_all_pods = lambda pods: {pod.name: pod.actual}
+    collector.metrics.collect_all_pods = lambda pods: {f"{pod.namespace}/{pod.name}": pod.actual}
     collector.metrics.available = True
 
     result = collector.collect_all_pods([pod])
@@ -175,7 +175,7 @@ def test_runtime_uses_metrics_when_host_is_ebpf_capable() -> None:
 
 def test_runtime_collector_builds_metric_key() -> None:
     collector = RuntimeCollector(prefer_ebpf=False)
-    collector.metrics.collect_all_pods = lambda pods: {p.name: p.actual for p in pods}
+    collector.metrics.collect_all_pods = lambda pods: {f"{p.namespace}/{p.name}": p.actual for p in pods}
     collector.metrics.available = True
     pods = [_pod(name="demo-pod", namespace="apps")]
     result = collector.collect_all_pods(pods)

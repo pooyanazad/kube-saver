@@ -82,7 +82,7 @@ class RuntimeCollector:
             result.source = MetricSource.METRICS_SERVER
             for pod in pods:
                 key = f"{pod.namespace}/{pod.name}"
-                usage = metric_map.get(pod.name)
+                usage = metric_map.get(key)
                 if usage is None or not self._is_metric_fresh(usage.observed_at, now):
                     if usage is not None:
                         result.warnings.append(
@@ -105,6 +105,10 @@ class RuntimeCollector:
             if result.metrics_available:
                 return result
 
+        # Full fallback: no namespace produced usable metrics. Reset every
+        # pod to an explicit estimated sample so pods whose ``actual`` was
+        # already populated by a partial read cannot keep stale real values
+        # mixed with estimated ones.
         result.source = MetricSource.ESTIMATED
         result.metrics_available = False
         result.used_fallback = True
