@@ -335,6 +335,25 @@ class TestRunDoctorSuccess:
         assert len(metrics) == 2
         assert all(not c.ok and not c.required for c in metrics)
 
+    def test_missing_metrics_api_is_reported_without_failing_doctor(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        cfg = tmp_path / "config"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+        fakes = _install_fake_kubernetes(monkeypatch)
+        fakes["client"].CustomObjectsApi.return_value.list_cluster_custom_object.side_effect = (
+            RuntimeError("Metrics API is not installed")
+        )
+
+        report = run_doctor()
+
+        assert report.ok
+        metrics_check = next(c for c in report.checks if c.name == "metrics-server available")
+        assert not metrics_check.ok
+        assert not metrics_check.required
+        assert "Metrics API is not installed" in metrics_check.detail
+
 
 # ── CLI integration ───────────────────────────────────────────────────────
 

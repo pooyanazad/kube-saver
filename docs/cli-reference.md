@@ -104,7 +104,7 @@ kube-saver version
 
 ### `kube-saver doctor`
 
-Check kubeconfig, connectivity, and RBAC. Use `--context NAME` to check a specific context. If `namespace_filter` is configured, RBAC checks target those namespaces. Missing metrics permissions are reported as optional because request-based estimates still work.
+Check kubeconfig, connectivity, RBAC, and Metrics API availability. Use `--context NAME` to check a specific context. If `namespace_filter` is configured, RBAC and metrics checks target those namespaces. Missing metrics permissions or an unavailable metrics-server are reported as optional because request-based estimates still work.
 
 ---
 

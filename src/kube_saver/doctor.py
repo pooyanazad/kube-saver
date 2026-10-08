@@ -414,6 +414,44 @@ def run_doctor(
                 )
             )
 
+    # RBAC alone cannot tell whether the aggregated Metrics API is installed
+    # and serving data. Probe it directly, but keep the result optional because
+    # scans can still run with request-based estimates.
+    metrics_api = k8s_client.CustomObjectsApi()
+    for namespace in namespaces:
+        name = "metrics-server available"
+        if namespace is not None:
+            name += f" in {namespace}"
+        try:
+            options = {
+                "group": "metrics.k8s.io",
+                "version": "v1beta1",
+                "plural": "pods",
+                "_request_timeout": op_timeout,
+            }
+            if namespace is None:
+                metrics_api.list_cluster_custom_object(**options)
+            else:
+                metrics_api.list_namespaced_custom_object(
+                    namespace=namespace, **options
+                )
+            report.checks.append(
+                CheckResult(name=name, ok=True, detail="Metrics API reachable", required=False)
+            )
+        except Exception as exc:  # noqa: BLE001
+            status = getattr(exc, "status", None)
+            reason = getattr(exc, "reason", None) or type(exc).__name__
+            detail = f"HTTP {status}: {reason}" if status else str(exc)
+            report.checks.append(
+                CheckResult(
+                    name=name,
+                    ok=False,
+                    detail=detail,
+                    hint="install metrics-server to measure usage; estimates remain available",
+                    required=False,
+                )
+            )
+
     return report
 
 
