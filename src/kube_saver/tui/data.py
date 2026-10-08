@@ -121,8 +121,8 @@ def load_data(config: KubeSaverConfig) -> TUIData:
     pricing = PricingEngine(provider=config.cloud_provider, tier=config.provider_tier)
     if config.pricing_has_custom_rates():
         pricing.set_rate(
-            cpu_per_core_hour=config.pricing.cpu_per_core_hour_usd,
-            memory_per_gb_hour=config.pricing.memory_per_gb_hour_usd,
+            cpu_per_core_hour=(config.pricing.cpu_per_core_hour_usd if config.pricing.cpu_per_core_hour_usd > 0 else None),
+            memory_per_gb_hour=(config.pricing.memory_per_gb_hour_usd if config.pricing.memory_per_gb_hour_usd > 0 else None),
         )
 
     if data.resource_report:

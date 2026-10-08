@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,9 +45,9 @@ class SafetyConfig:
     Attributes:
         min_cpu_millicores: Never recommend below this many millicores.
         min_memory_bytes: Never recommend below this many bytes.
-        prod_cpu_floor_ratio: Floor as ratio of current request in prod.
-        prod_memory_floor_ratio: Floor as ratio of current request in prod.
-        aggressive_mode: If True, ignore floors (for dev/staging use).
+        prod_cpu_floor_ratio: Request-relative floor for all workloads in normal mode.
+        prod_memory_floor_ratio: Memory request-relative floor in normal mode.
+        aggressive_mode: If True, skip relative floors but retain absolute floors.
     """
 
     min_cpu_millicores: float = 100.0
@@ -54,6 +55,27 @@ class SafetyConfig:
     prod_cpu_floor_ratio: float = 0.5
     prod_memory_floor_ratio: float = 0.5
     aggressive_mode: bool = False
+
+    def normalized(self) -> SafetyConfig:
+        """Reject invalid floors rather than silently removing protection."""
+        def positive(value: float, default: float) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return default
+            return number if math.isfinite(number) and number > 0 else default
+
+        def ratio(value: float) -> float:
+            number = positive(value, 0.5)
+            return min(number, 1.0)
+
+        return SafetyConfig(
+            min_cpu_millicores=positive(self.min_cpu_millicores, 100.0),
+            min_memory_bytes=math.ceil(positive(self.min_memory_bytes, 128 * 1024**2)),
+            prod_cpu_floor_ratio=ratio(self.prod_cpu_floor_ratio),
+            prod_memory_floor_ratio=ratio(self.prod_memory_floor_ratio),
+            aggressive_mode=self.aggressive_mode,
+        )
 
 
 @dataclass
@@ -582,6 +604,7 @@ def default_config_yaml() -> str:
         "min_cpu_millicores": default.safety.min_cpu_millicores,
         "min_memory_bytes": default.safety.min_memory_bytes,
         "prod_cpu_floor_ratio": default.safety.prod_cpu_floor_ratio,
+        "prod_memory_floor_ratio": default.safety.prod_memory_floor_ratio,
         "aggressive_mode": default.safety.aggressive_mode,
         "alerts": {
             "warning_waste_ratio": default.alerts.warning_waste_ratio,
