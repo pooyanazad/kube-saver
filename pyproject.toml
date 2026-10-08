@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kube-saver"
 dynamic = ["version"]
-description = "k9s-style TUI that shows you exactly where your Kubernetes money goes"
+description = "Kubernetes CPU and memory cost estimation, terminal dashboard, and resource right-sizing plans"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -17,12 +17,13 @@ keywords = [
     "k8s",
     "devops",
     "cost-optimization",
-    "eBPF",
+    "resource-right-sizing",
+    "finops",
+    "metrics-server",
     "tui",
     "terminal",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Framework :: AsyncIO",
     "Intended Audience :: Developers",
@@ -68,6 +69,7 @@ kube-saver = "kube_saver.cli:main"
 [project.urls]
 Homepage = "https://github.com/pooyanazad/kube-saver"
 Repository = "https://github.com/pooyanazad/kube-saver"
+Documentation = "https://github.com/pooyanazad/kube-saver/blob/main/docs/README.md"
 Issues = "https://github.com/pooyanazad/kube-saver/issues"
 
 [tool.hatch.build.targets.wheel]

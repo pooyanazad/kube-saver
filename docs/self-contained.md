@@ -1,12 +1,18 @@
 # Self-contained outputs
 
-kube-saver is designed to remain useful even with no maintainer-operated service behind it. Every output works offline, needs no external dependency, and is safe to email or commit.
+kube-saver produces portable report and review files without a maintainer-operated
+service. Reading an HTML report works offline; scanning, serving fresh data, or
+executing patch commands requires Kubernetes API access. Review internal cluster
+names before sharing or committing generated files.
 
 ---
 
 ## Design guarantee
 
-If the kube-saver repository disappeared tomorrow, every release artifact and every file kube-saver has already generated would continue to work exactly as before. There is no hosted service, no CDN dependency, and no external API call in any output format.
+Generated HTML uses inline assets and does not call a hosted service. Local
+Markdown and JSON remain readable with standard tools. Running the application
+still requires its Python dependencies, credentials, and cluster access; release
+artifacts are not a guarantee of compatibility with future environments.
 
 ---
 
@@ -16,7 +22,7 @@ If the kube-saver repository disappeared tomorrow, every release artifact and ev
 
 - Fully self-contained: inline CSS, no JavaScript, no CDN, no hosted assets
 - Works offline in any browser
-- Safe to email as an attachment or commit to a repository
+- Review for internal cluster names before emailing or committing
 - Contains the full waste breakdown, cost table, and recommendation list as of the generation time
 - The report is a snapshot, it does not fetch live data
 
@@ -35,12 +41,12 @@ The `apply-patches.sh` script is **not auto-executed**. It is a file you review,
 
 ### Notifications (`kube-saver notify`)
 
-Two Markdown files written per run:
+A daily summary and, when eligible, a spike alert:
 
 | File | Content |
 |---|---|
 | `daily-summary-{date}.md` | Namespace-level waste, cost, and efficiency table |
-| `spike-alert-{date}.md` | Only written when a namespace exceeds your configured monthly USD threshold |
+| `spike-alert-{date}.md` | Written above `notify --threshold` (default $100/month), with complete measured metrics and no partial scan |
 
 These files are designed to be consumed by:
 
@@ -65,15 +71,14 @@ Standard JSON, no hosted dependency:
 
 ## Why no hosted service
 
-Most cost tools need a hosted dashboard, a Prometheus stack, or a cloud billing integration. kube-saver deliberately avoids all three:
+There is no required kube-saver account, hosted dashboard, or CDN for reports.
+Install the package, grant Kubernetes read permissions, and use metrics-server
+for measured usage. Air-gapped installations need the package and dependencies
+available locally; credential acquisition depends on the kubeconfig.
 
-- **Faster to try**, no account, no API key, no infrastructure to set up
-- **Works anywhere**, local clusters, air-gapped environments, CI runners, laptops
-- **No data leaves your machine**, important for regulated and security-conscious environments
-- **No single point of failure**, if we go offline, nothing in your workflow breaks
-- **No supply chain risk from hosted dependencies**, no CDN to go down, no API to change
-
-The tradeoff: kube-saver gives you a snapshot, not a live dashboard. It tells you where the waste is right now and gives you a plan to fix it. It does not replace live monitoring or autoscaling.
+The report is a snapshot with modeled CPU/memory costs. It does not replace
+continuous monitoring, invoice reconciliation, or autoscaling. See the
+[cost model and FAQ](faq.md) for what the numbers mean.
 
 ---
 

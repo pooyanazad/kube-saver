@@ -1,139 +1,64 @@
-# Support matrix
+# Support matrix and verification status
 
-This page documents what kube-saver supports today. If you are running something
-not listed here, it will probably still work, this is what we have actually
-tested.
+This matrix separates dated evidence from declared compatibility. **Unverified**
+means no reproducible test record was collected for that environment; it is not
+proof of incompatibility. Evidence was reviewed on 2026-10-08 UTC against
+`adef5ff`. See [dated support evidence](support-evidence.md) for links and limits.
 
-## Project
+## Python and packaging
 
-| Component        | Supported                                       |
-| ---------------- | ----------------------------------------------- |
-| Latest version   | see [GitHub releases](https://github.com/pooyanazad/kube-saver/releases) |
-| License          | MIT                                             |
-| Distribution     | PyPI (wheel + sdist), Docker Hub (`pooyanazad/kube-saver`) |
-| Release cadence  | as needed, no fixed schedule                   |
+| Environment | Verification status | Evidence |
+|---|---|---|
+| Python 3.10, 3.11, 3.12 on Linux x86_64 | Unit tests and wheel CLI smoke checks passed | CI on 2026-10-08 UTC |
+| Python 3.13 | Declared in package metadata; unverified here | No dated 3.13 run collected |
+| Python < 3.10 | Not supported by package metadata | `requires-python = ">=3.10"` |
+| Wheel and sdist build | Verified in CI and local audit | Source reports 1.3.0; release tag identity is separate |
+| Current PyPI and Docker Hub tags | Unverified fresh-install state | Do not infer package version from a GitHub release tag |
 
-## Python
+## Operating systems and architectures
 
-| Version | Supported | Notes                          |
-| ------- | --------- | ------------------------------ |
-| 3.12    | yes       | primary development target     |
-| 3.11    | yes       | tested in CI                   |
-| 3.10    | yes       | tested in CI                   |
-| < 3.10  | no        | `requires-python = ">=3.10"`   |
+| Environment | Verification status |
+|---|---|
+| Ubuntu 24.04, x86_64 / linux/amd64 | Live Docker + kind smoke test passed |
+| Other Linux distributions | Unverified live compatibility |
+| Linux ARM64 | Unverified; current Docker workflow does not specify a multi-platform build |
+| macOS Intel / Apple Silicon | Unverified; no dated run collected |
+| Windows native / WSL2 | Unverified; no dated run collected |
 
-## Operating systems
+## Containers and Kubernetes environments
 
-| OS                  | Supported | Notes                                          |
-| ------------------- | --------- | ---------------------------------------------- |
-| Linux (x86_64)      | yes       | primary development and runtime target         |
-| Linux (arm64)       | yes       | Docker image built for both architectures      |
-| macOS (x86_64)      | yes       | works on developer machines                    |
-| macOS (arm64)       | yes       | works on Apple Silicon                         |
-| Windows (x86_64)    | partial   | works in WSL2; native Windows not yet tested   |
+| Environment | Verification status | Scope |
+|---|---|---|
+| Docker 28.0.4 + kind 0.23.0, Kubernetes 1.30.0 | Live smoke test passed | API access, HTML generation, doctor; no metrics-server |
+| Kubernetes 1.27, 1.28, 1.29, other versions | Unverified | No dated run collected |
+| Podman, containerd, CRI-O | Unverified | No dated application run collected |
+| minikube, k3d/k3s, Docker Desktop Kubernetes | Unverified | No dated run collected |
+| EKS, GKE, AKS, Rancher/RKE, OpenShift | Unverified | No dated managed-cluster run collected |
+| Custom controllers / CRDs | Unverified | Read-only pod discovery does not establish arbitrary controller support |
 
-## Container runtimes (for the Docker image)
+The plan exporter emits patches for Deployments, StatefulSets, and DaemonSets.
+Other workload kinds do not receive an executable patch. This is a source-code
+boundary, not a claim that all three have been live-tested.
 
-| Runtime       | Supported |
-| ------------- | --------- |
-| Docker        | yes       |
-| Podman        | yes       |
-| containerd    | yes       |
-| CRI-O         | yes       |
+## Permissions and telemetry
 
-## CPU architectures
+| Scenario | Verification status |
+|---|---|
+| Broad read permissions in kind CI | Live API/report/doctor smoke evidence |
+| Namespace Role + `namespace_filter` | Mocked collector/doctor regression tests; live Role deployment unverified |
+| Restricted/denied resources | Mocked regression tests; live restricted identity unverified |
+| Missing metrics-server | Live estimate-mode report and optional doctor warning verified |
+| Fresh, missing, stale, and partial metrics samples | Mocked regression tests; measured workload sizing unverified in the collected live run |
+| eBPF | Capability detection only; live probes are not implemented |
 
-| Architecture | Supported | Notes                                  |
-| ------------- | --------- | -------------------------------------- |
-| linux/amd64   | yes       | primary                                |
-| linux/arm64   | yes       | built and pushed by CI                 |
-| darwin/amd64  | yes       | local install only                     |
-| darwin/arm64  | yes       | local install only                     |
+Read permissions are documented in [RBAC](rbac.md). `doctor` checks connection,
+permissions and Metrics API availability; it does not establish every pod's
+sample coverage or validate recommendations under representative load.
 
-## Kubernetes
+## Adding evidence
 
-| Component                                | Supported                    |
-| ---------------------------------------- | ---------------------------- |
-| Kubernetes API server (read-only)        | yes                          |
-| `metrics-server` (for actual usage)      | yes, required for real numbers |
-| eBPF runtime data                        | capability detection only; no live probes |
-| CRDs (any kind)                          | yes, kube-saver is read-only  |
-| Server-side apply                        | not used                      |
-
-### API server versions tested
-
-| Version | Status    |
-| ------- | --------- |
-| 1.30    | tested    |
-| 1.29    | tested    |
-| 1.28    | tested    |
-| 1.27    | tested    |
-| < 1.27  | not tested, probably works but not verified |
-
-## Cluster types
-
-| Type                                           | Tested    |
-| ---------------------------------------------- | --------- |
-| `kind` (local)                                 | yes       |
-| `minikube`                                     | yes       |
-| `k3d` / `k3s`                                  | yes       |
-| Docker Desktop built-in cluster                | yes       |
-| AWS EKS                                        | partial   |
-| GCP GKE                                        | partial   |
-| Azure AKS                                      | not yet   |
-| Rancher / RKE                                  | not yet   |
-| OpenShift                                      | not yet   |
-
-"Partial" means kube-saver ran successfully against the API but only one
-test pass was performed. Please report issues if you find a real cluster
-type that breaks.
-
-## RBAC environments
-
-kube-saver needs read access to the API. Tested against:
-
-| RBAC scenario                                | Status    |
-| -------------------------------------------- | --------- |
-| Cluster-admin (no restrictions)              | works     |
-| Read-only cluster role                       | works     |
-| Namespace-scoped read role                   | works with `namespace_filter` |
-| Tightly restricted (specific verbs only)     | works, `doctor` reports missing verbs |
-
-For exact RBAC requirements, see [docs/safety.md](safety.md#read-only-rbac-recipe).
-
-## Runtime data sources
-
-kube-saver picks the best available source automatically.
-
-| Source          | When used                            | Accuracy      |
-| --------------- | ------------------------------------ | ------------- |
-| metrics-server  | when the Metrics API is available     | high          |
-| Estimates only  | if no metrics-server                 | rough, based on requests, not usage |
-
-The eBPF module currently detects host capabilities but deliberately reports no
-metrics. This prevents placeholder values from being mistaken for observations.
-
-## How to verify your environment
-
-Run `kube-saver doctor` (or `python -m kube_saver.cli doctor`) to check:
-
-- kubeconfig file is readable
-- context exists and is reachable
-- cluster API server is reachable
-- required RBAC permissions are present
-- metrics-server is available (for real numbers)
-- current Python and kube-saver version
-
-`doctor` is non-destructive, it only reads cluster metadata and exits.
-
-## Reporting unsupported configurations
-
-If you run kube-saver on a combination not listed here and it works, please
-open an issue or pull request so we can add it. Same if it doesn't work,
-that is more important to know.
-
-## Pre-release testing
-
-Before each release, kube-saver is tested against three cluster environments:
-local, managed cloud, and restricted RBAC. See
-[Release testing](release-testing.md) for the procedure.
+Record the UTC date, source SHA, package version, OS/architecture, Python,
+Kubernetes version, identity/RBAC, metrics coverage, commands, exit codes, and
+sanitized output or CI links. Separate a passing smoke check from workload/load
+validation. Use the [release testing procedure](release-testing.md), and mark
+skipped environments with a reason instead of filling them with PASS.

@@ -11,10 +11,14 @@ The image is at `pooyanazad/kube-saver` on Docker Hub. The container runs as an 
 The simplest case: you have a kubeconfig on your machine and you run kube-saver locally in a container.
 
 ```bash
+mkdir -p reports
 docker run --rm \
-  -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
+  --user "$(id -u):$(id -g)" \
+  -e KUBECONFIG=/tmp/kubeconfig \
+  -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+  -v "$PWD/reports:/out" \
   pooyanazad/kube-saver:latest \
-  report -o /tmp/report.html
+  report -o /out/report.html
 
 docker run --rm \
   -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
@@ -22,7 +26,16 @@ docker run --rm \
   doctor
 ```
 
-The mount path `/home/kube-saver/.kube/config` matches the image's default `KUBECONFIG` location.
+The first command preserves `reports/report.html` on the host after `--rm`
+removes the container. On Linux/macOS, `--user` matches the host directory owner;
+`KUBECONFIG` is explicit because the user override can change home discovery.
+The doctor example uses the image user's conventional kubeconfig path.
+
+Kubeconfigs that reference certificate files need those files mounted too.
+Exec credential plugins such as `aws`, `gcloud`, or `kubelogin` must be available
+inside the container; the base image does not install them. Use a suitable image
+or run natively. Local cluster endpoints on `127.0.0.1` also need a network path
+from the container (the CI smoke test uses host networking on Linux).
 
 > Always mount `:ro` (read-only). kube-saver never modifies your kubeconfig.
 
@@ -71,6 +84,8 @@ spec:
   template:
     spec:
       serviceAccountName: kube-saver
+      securityContext:
+        fsGroup: 2000
       restartPolicy: Never
       containers:
         - name: kube-saver
@@ -84,48 +99,48 @@ spec:
           emptyDir: {}
 ```
 
-The image's built-in user is non-root and the entrypoint is `kube-saver`. No special security context is required beyond the service account.
+The image's built-in user is non-root and the entrypoint is `kube-saver`.
+`fsGroup` grants that process access to the mounted output volume. The example
+uses ephemeral `emptyDir` storage; it does not export the report off the pod.
+Use persistent storage or an artifact-copy step for retention. For namespace
+Roles, the Job namespace and service account must match the RoleBinding.
 
 ### Cross-cloud in-cluster auth
 
-| Provider              | Auth source                                                          |
-|-----------------------|----------------------------------------------------------------------|
-| EKS (IRSA)            | Service account annotated with `eks.amazonaws.com/role-arn`          |
-| GKE (Workload Identity) | Service account annotated with `iam.gke.io/gcp-service-account`     |
-| AKS (Workload Identity) | Service account annotated with `azure.workload.identity/client-id`  |
-| On-prem / kind        | Static token in the pod's service account mount                       |
-
-If you already have a kubeconfig on disk, you can also pass it via `KUBECONFIG` to override in-cluster auth.
+On EKS, GKE, AKS, or a local cluster, in-cluster access uses the mounted
+Kubernetes service account token plus Kubernetes RBAC. Cloud workload identity
+annotations grant cloud API access when configured; they do not replace the
+RoleBinding required here. The client uses an available kubeconfig first and
+otherwise loads in-cluster credentials. An explicit `KUBECONFIG` must reference
+an existing file.
 
 ---
 
 ## Option 3: CI / GitHub Actions
 
-A typical CI step that runs `kube-saver report` against a test cluster:
+A native CI example, after setting up Python 3.10+ with `actions/setup-python`.
+Here `KUBECONFIG_YAML` is a secret containing kubeconfig **contents**;
+`KUBECONFIG` must point to the file written on the runner:
 
 ```yaml
-- name: Run kube-saver
+- name: Prepare kubeconfig
   env:
-    KUBECONFIG: ${{ secrets.KUBECONFIG }}
+    KUBECONFIG_YAML: ${{ secrets.KUBECONFIG }}
   run: |
-    docker run --rm \
-      -v "$KUBECONFIG:/home/kube-saver/.kube/config:ro" \
-      -v "$PWD:/out" \
-      pooyanazad/kube-saver:latest \
-      report -o /out/cost-report.html
-```
+    umask 077
+    printf '%s' "$KUBECONFIG_YAML" > "$RUNNER_TEMP/kubeconfig"
+    echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
 
-Or install from PyPI and run natively:
-
-```yaml
 - name: Install kube-saver
-  run: pip install kube-saver
+  run: python -m pip install kube-saver
 
 - name: Generate report
-  env:
-    KUBECONFIG: ${{ secrets.KUBECONFIG }}
   run: kube-saver report -o cost-report.html
 ```
+
+The runner still needs network access, valid credentials and read permissions.
+If your kubeconfig uses an exec plugin, install it on the runner. Archive the
+report using your CI artifact mechanism after reviewing who can access it.
 
 ---
 

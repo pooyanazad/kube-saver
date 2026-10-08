@@ -1,6 +1,7 @@
 # CLI reference
 
-Every command, flag, and code helper kube-saver exposes. If something is missing here, it does not exist.
+Commands, supported flags, and selected Python helpers from the source checkout.
+Use your installed command's `--help` to check released-package behavior.
 
 ## Commands
 
@@ -104,7 +105,7 @@ kube-saver version
 
 ### `kube-saver doctor`
 
-Check kubeconfig, connectivity, RBAC, and Metrics API availability. Use `--context NAME` to check a specific context. If `namespace_filter` is configured, RBAC and metrics checks target those namespaces. Missing metrics permissions or an unavailable metrics-server are reported as optional because request-based estimates still work.
+Check kubeconfig, connectivity, RBAC, and Metrics API availability. Use `--context NAME` to override the configured scan context. If `namespace_filter` is configured, RBAC and metrics checks target those namespaces. Missing metrics permissions or an unavailable metrics-server are reported as optional because request-based estimates still work. This checks API availability, not fresh sample coverage for every pod.
 
 ---
 

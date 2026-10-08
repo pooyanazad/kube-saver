@@ -1,15 +1,14 @@
-# kube-saver
+# kube-saver: Kubernetes cost estimation and resource right-sizing
 
-> **See exactly where your Kubernetes money goes, then fix it.**
-
-A fast, offline, self-contained Kubernetes cost analyzer.
-Works from your kubeconfig alone, no cloud account, no SaaS signup, no hosted service.
-Turns invisible cluster waste into visible dollar amounts you can act on in one command.
+Estimate Kubernetes CPU and memory costs from resource requests, metrics-server
+usage, and configured pricing rates. Inspect a terminal dashboard, generate a
+self-contained HTML report, or write a local resource-change plan for review.
+Live scans need Kubernetes API access; generated reports can be opened offline.
+No hosted kube-saver account or service is required.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg)](https://kubernetes.io/)
-[![Status: Production](https://img.shields.io/badge/status-production-brightgreen.svg)](https://github.com/pooyanazad/kube-saver)
 
 ---
 
@@ -28,14 +27,16 @@ Turns invisible cluster waste into visible dollar amounts you can act on in one 
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- **Real dollar amounts** for every namespace, workload, and pod, not just millicores
-- **Interactive TUI**, k9s-style keyboard navigation, cost and recommendation views
-- **Self-contained HTML report**, open in any browser, email as-is, no CDN
-- **Local PR plans**, review and apply right-sizing changes without touching a cloud API
-- **Markdown spike alerts**, daily summaries written to local files, no webhook needed
-- **Two safe runtime modes**: metrics-server usage → request-based estimates
+Illustrative display only: a 0% efficiency value with estimated telemetry does not prove that workloads are idle.
 
-Cost figures are projections from configured rates and a point-in-time scan. Without metrics-server, request-based figures are upper bounds; they do not trigger right-sizing recommendations or spike alerts.
+- **Modeled CPU and memory costs** for namespaces, workloads, and pods
+- **Interactive TUI**, k9s-style keyboard navigation, cost and recommendation views
+- **Self-contained HTML report**, inline assets and no CDN; review before sharing
+- **Local resource-change plans**, review files and patch commands; no GitHub PR is opened
+- **Markdown spike alerts**, daily summaries written to local files, no webhook needed
+- **Measured usage or estimated fallback**: metrics-server samples → request-based estimates
+
+Cost figures are projections from configured rates and a point-in-time scan. Without metrics-server, request-based figures are upper bounds; they do not trigger right-sizing recommendations or spike alerts. They are not cloud invoices or guaranteed bill savings. See the [cost model and FAQ](docs/faq.md).
 
 ---
 
@@ -54,14 +55,19 @@ Cost figures are projections from configured rates and a point-in-time scan. Wit
 <p align="center">
   <img src="docs/screenshots/recommendations.png" alt="kube-saver recommendations" width="780" />
 </p>
-<p align="center"><em>Actionable right-sizing recommendations with savings per workload.</em></p>
+<p align="center"><em>Candidate right-sizing recommendations with modeled savings per workload; review against representative load.</em></p>
 
 ---
 
 ## Quick start
 
+Requires Python 3.10+ and read access to a Kubernetes cluster. Install metrics-server for measured usage and right-sizing candidates.
+
 ```bash
-pip install kube-saver
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install kube-saver
+kube-saver doctor
 ```
 
 ```bash
@@ -69,43 +75,33 @@ pip install kube-saver
 kube-saver
 
 # Self-contained HTML report
-kube-saver report -o cost-report.html && open cost-report.html
+kube-saver report -o cost-report.html --json cost-report.json
+# Open cost-report.html in your browser
 
 # Local PR plan with review and apply files
 kube-saver pr-plan -d ./pr-files
 ```
 
-Time to first result: **under 5 minutes** if you have `kubectl` access to any cluster.
 See the [full getting started guide](docs/getting-started.md) for kind, EKS, Docker Desktop, and generic kubeconfig.
 
 ---
 
-## Before / after example
+## Interpreting results
 
-```
-prod/auth-svc        cpu-request  1000m  → 50m      save ~$25/mo per replica
-prod/auth-svc        mem-request  2.0Gi  → 64Mi     save ~$15/mo per replica
-staging/staging-api  cpu-request   300m  → 50m      save ~$7/mo per replica
-```
+Recommendations use current metrics samples, not historical peaks. They skip
+estimated samples and multi-container pods. Smaller resource requests may free
+cluster capacity without changing your cloud bill. Review candidate changes
+against workload bursts, scheduling, and service objectives before applying them.
 
-Real output from the demo cluster: **40 high-confidence recommendations, $373.03/mo potential savings**, see the [recommendations screenshot](docs/screenshots/recommendations.png).
+`pr-plan` writes files locally. Running its generated `kubectl patch` script
+changes the cluster; it does not update GitOps manifests or open a GitHub PR.
+See [safety and trust](docs/safety.md) for the current recommendation boundaries.
 
----
+## Where kube-saver fits
 
-## Why kube-saver instead of …
-
-| Feature | **kube-saver** | k9s | Goldilocks | VPA | Kubecost |
-|---|---|---|---|---|---|
-| Cost in dollars | ✅ | ❌ | ❌ | ❌ | ✅ |
-| Fully offline | ✅ | ✅ | ✅ | ✅ | ❌ needs Prometheus |
-| Self-contained HTML report | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Interactive TUI | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Right-sizing recommendations | ✅ | ❌ | ✅ | ✅ live | partial |
-| Local PR plan generator | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Works without hosted service | ✅ | ✅ | ✅ | ✅ | ❌ |
-
-kube-saver's niche: **dollar-first, offline, shareable**.
-It does not replace live autoscaling, it gives you the number and the plan.
+kube-saver focuses on local cost estimates and portable review files. For ongoing
+cost allocation, historical sizing, or automatic resource updates, compare the
+workflows in the [comparison guide](docs/comparison.md).
 
 ---
 
@@ -123,15 +119,15 @@ Teams that need live automated right-sizing (use VPA), billing-data ingestion (u
 
 ## How it stays independent
 
-kube-saver has **no hosted service, no account, and no external dependency**:
+kube-saver has **no required hosted service or account**:
 
 - HTML reports are fully self-contained (inline CSS, no CDN, works offline)
 - Notifications are written to local Markdown files
-- PR plans are local review/apply files, no cloud API
+- PR plans are local review/apply files; executing patches requires Kubernetes API access
 - The HTTP API is loopback-only by default
-- Releases are published via GitHub Actions, no PyPI token needed
+- Build, test, and release workflows run through GitHub Actions
 
-If this repo disappeared tomorrow, every release artifact still works.
+Live scans require cluster connectivity, Python dependencies, and valid credentials. Kubeconfig credential plugins may contact identity providers. Review reports for internal cluster names before sharing them.
 
 ---
 
@@ -139,11 +135,13 @@ If this repo disappeared tomorrow, every release artifact still works.
 
 | Document | What's inside |
 |---|---|
+| [Documentation index](docs/README.md) | Browse all guides by task |
+| [Cost model and FAQ](docs/faq.md) | Pricing formula, telemetry, limitations |
 | [Getting started](docs/getting-started.md) | First-run guide for kind, EKS, Docker Desktop, generic kubeconfig |
 | [CLI reference](docs/cli-reference.md) | Every command, flag, JSON helper, server mode |
-| [Configuration](docs/configuration.md) | Currency, pricing, env vars, all config keys |
+| [Configuration](docs/configuration.md) | Currency, modeled pricing, configuration and env vars |
 | [Architecture](docs/architecture.md) | Module map, data flow, runtime source chain |
-| [Comparison](docs/comparison.md) | Detailed comparison vs k9s, Goldilocks, VPA, Kubecost |
+| [Comparison](docs/comparison.md) | Workflow comparison with k9s, Goldilocks, VPA, OpenCost |
 | [Safety & trust](docs/safety.md) | What kube-saver will never do, RBAC, recommendation boundaries |
 | [Self-contained outputs](docs/self-contained.md) | Why no hosted service, output guarantees |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
@@ -155,8 +153,12 @@ If this repo disappeared tomorrow, every release artifact still works.
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow.
 
 ```bash
-git checkout -b my-change
+git clone https://github.com/pooyanazad/kube-saver.git
+cd kube-saver
+python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -e ".[dev]"
+git checkout -b my-change
 pytest tests -q
 ruff check src tests
 mypy src
