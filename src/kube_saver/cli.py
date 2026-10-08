@@ -13,6 +13,7 @@ Subcommands::
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ from kube_saver.analyzers.resource_waste import (
 )
 from kube_saver.collectors.k8s_client import K8sClient
 from kube_saver.collectors.runtime import RuntimeCollector
-from kube_saver.models.core import Recommendation, ScanResult
+from kube_saver.models.core import MetricSource, Recommendation, ScanResult
 from kube_saver.pricing.engine import PricingEngine
 from kube_saver.recommenders.engine import generate_recommendations
 
@@ -95,10 +96,8 @@ def _safe_run_analysis() -> tuple[
     * ApiException (any other HTTP)                -> ANALYSIS_ERROR (4)
     * Any other exception                          -> GENERAL_ERROR (1)
 
-    Note: a *partial* scan (``ScanResult.partial``) is not an error — the
-    pipeline still completes and the ``ScanResult`` is returned so the
-    degraded flag can surface in the HTTP response. Exit codes only fire
-    when the pipeline cannot run at all.
+    A partial scan still returns its usable data with a warning. A fully
+    failed scan exits with ANALYSIS_ERROR instead of writing an empty report.
     """
     # Resolve exception classes from the kubernetes package lazily so this
     # module can be imported without it installed.
@@ -117,7 +116,18 @@ def _safe_run_analysis() -> tuple[
         pass
 
     try:
-        return _run_analysis()
+        result = _run_analysis()
+        scan = result[3]
+        if scan.failed:
+            detail = "; ".join(scan.errors) or "no pod data could be collected"
+            click.echo(f"Error: pod scan failed — {detail}", err=True)
+            raise SystemExit(exitcodes.ANALYSIS_ERROR)
+        if scan.partial:
+            click.echo(
+                f"Warning: pod scan incomplete — {'; '.join(scan.errors)}",
+                err=True,
+            )
+        return result
     except SystemExit:
         raise
     except FileNotFoundError as exc:
@@ -209,13 +219,29 @@ def tui() -> None:
 
 @cli.command()
 @click.option("-o", "--output", default="kube-saver-report.html", help="Output HTML file path.")
-def report(output: str) -> None:
+@click.option("--json", "json_output", default=None, type=click.Path(), help="Also write a JSON report.")
+def report(output: str, json_output: str | None) -> None:
     """Generate a self-contained HTML executive report."""
-    resource_report, cost_report, recs, _scan = _safe_run_analysis()
+    resource_report, cost_report, recs, scan = _safe_run_analysis()
     from kube_saver.exporters.report_generator import generate_html_report
-    result = generate_html_report(resource_report, cost_report, recs)
+    result = generate_html_report(
+        resource_report, cost_report, recs, degraded_errors=scan.errors
+    )
     Path(output).write_text(result.html, encoding="utf-8")
     click.echo(f"Report written to {output}")
+    if json_output:
+        from kube_saver.exporters.json_output import build_json_report
+
+        payload = build_json_report(
+            cluster=None,
+            resource_report=resource_report,
+            cost_report=cost_report,
+            recommendations=recs,
+            degraded=scan.partial,
+            degraded_errors=scan.errors,
+        )
+        Path(json_output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        click.echo(f"JSON report written to {json_output}")
 
 
 # ── PR Plan ───────────────────────────────────────────────────────────────
@@ -244,23 +270,40 @@ def pr_plan(out_dir: str) -> None:
 @click.option("--threshold", default=100.0, help="Monthly USD threshold for spike alerts.")
 def notify(out_dir: str, threshold: float) -> None:
     """Write daily summary + spike alert Markdown files to disk."""
-    resource_report, cost_report, _recs, _scan = _safe_run_analysis()
+    resource_report, cost_report, _recs, scan = _safe_run_analysis()
     from kube_saver.exporters.notifier import (
         build_daily_summary,
         build_spike_alert,
         write_notification,
     )
 
-    summary = build_daily_summary(resource_report, cost_report)
+    summary = build_daily_summary(
+        resource_report, cost_report, degraded_errors=scan.errors
+    )
     path = write_notification(summary, output_dir=out_dir)
     click.echo(f"Daily summary: {path}")
 
-    spike = build_spike_alert(cost_report, threshold_monthly_usd=threshold)
+    # Request-only estimates are an upper bound, not evidence of a cost spike.
+    measured_pods = sum(
+        pw.pod.actual.source is not MetricSource.ESTIMATED
+        for ns in resource_report.namespaces
+        for pw in ns.pod_waste
+    )
+    spike = (
+        build_spike_alert(cost_report, threshold_monthly_usd=threshold)
+        if measured_pods == resource_report.total_pods
+        and resource_report.metrics_available
+        and not scan.partial
+        else None
+    )
     if spike is not None:
         path = write_notification(spike, output_dir=out_dir)
         click.echo(f"Spike alert:   {path}")
     else:
-        click.echo(f"No spike alert (waste under ${threshold:.2f} threshold)")
+        if scan.partial or measured_pods < resource_report.total_pods:
+            click.echo("No spike alert (incomplete scan or runtime metrics unavailable)")
+        else:
+            click.echo(f"No spike alert (waste under ${threshold:.2f} threshold)")
 
 
 # ── Serve ─────────────────────────────────────────────────────────────────

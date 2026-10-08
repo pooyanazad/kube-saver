@@ -11,7 +11,7 @@ from html import escape
 
 from kube_saver.analyzers.cost_waste import CostWasteReport, NamespaceCostAnalysis
 from kube_saver.analyzers.resource_waste import ResourceWasteReport
-from kube_saver.models.core import Recommendation
+from kube_saver.models.core import MetricSource, Recommendation
 
 
 @dataclass
@@ -76,6 +76,7 @@ gap:12px;margin:20px 0}
 text-align:center}
 .card strong{display:block;font-size:.85rem;color:#6b7280;margin-bottom:4px}
 .card .val{font-size:1.5rem;font-weight:700;color:#111827}
+.notice{border-left:4px solid #d97706;background:#fffbeb;padding:10px 14px;margin:12px 0}
 .chart-section{margin:24px 0}
 .bar-row{display:flex;align-items:center;margin-bottom:6px}
 .bar-label{min-width:140px;text-align:right;padding-right:10px;font-size:.85rem;
@@ -94,6 +95,8 @@ def generate_html_report(
     resource_report: ResourceWasteReport,
     cost_report: CostWasteReport,
     recommendations: list[Recommendation],
+    *,
+    degraded_errors: list[str] | None = None,
 ) -> HtmlReportResult:
     """Generate a self-contained HTML report with charts.
 
@@ -131,6 +134,33 @@ def generate_html_report(
     waste_chart = _ns_bar_chart(cost_report.namespaces)
     eff_chart = _efficiency_chart(cost_report.namespaces)
 
+    measured_pods = sum(
+        pw.pod.actual.source is not MetricSource.ESTIMATED
+        for ns in resource_report.namespaces
+        for pw in ns.pod_waste
+    )
+    notices: list[str] = []
+    if degraded_errors:
+        notices.append(
+            "Incomplete scan: some namespaces could not be read. "
+            "Totals exclude those namespaces. Errors: "
+            + "; ".join(degraded_errors)
+        )
+    if resource_report.total_pods and measured_pods == 0:
+        notices.append(
+            "Runtime metrics unavailable. Waste figures use requested capacity "
+            "as an upper bound; they are not measured savings."
+        )
+    elif measured_pods < resource_report.total_pods:
+        notices.append(
+            f"Runtime metrics cover {measured_pods} of {resource_report.total_pods} pods. "
+            "Figures for the other pods use requested capacity as an upper bound."
+        )
+    notice_html = "".join(
+        f'<div class="notice" role="note">{escape(message)}</div>'
+        for message in notices
+    )
+
     charts_html = ""
     if waste_chart:
         charts_html += (
@@ -152,11 +182,13 @@ def generate_html_report(
 </head>
 <body>
 <h1>kube-saver executive summary</h1>
+<p>Estimated monthly cost of requested resources unused at the time of this scan. Pricing is a model, not a cloud bill.</p>
+{notice_html}
 <div class="summary">
   <div class="card"><strong>Total pods</strong><span class="val">{resource_report.total_pods}</span></div>
   <div class="card"><strong>CPU waste</strong><span class="val">{resource_report.total_cpu_waste_millicores:.0f}m</span></div>
   <div class="card"><strong>Memory waste</strong><span class="val">{resource_report.total_memory_waste_bytes // 1024**2}Mi</span></div>
-  <div class="card"><strong>Monthly savings</strong><span class="val">${cost_report.total_cost_waste.monthly_usd:.2f}</span></div>
+  <div class="card"><strong>Estimated monthly waste</strong><span class="val">${cost_report.total_cost_waste.monthly_usd:.2f}</span></div>
 </div>
 
 {charts_html}

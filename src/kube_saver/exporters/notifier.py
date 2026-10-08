@@ -13,6 +13,7 @@ from pathlib import Path
 
 from kube_saver.analyzers.cost_waste import CostWasteReport
 from kube_saver.analyzers.resource_waste import ResourceWasteReport
+from kube_saver.models.core import MetricSource
 
 
 @dataclass
@@ -50,6 +51,8 @@ class NotificationRateLimiter:
 def build_daily_summary(
     resource_report: ResourceWasteReport,
     cost_report: CostWasteReport,
+    *,
+    degraded_errors: list[str] | None = None,
 ) -> NotificationMessage:
     """Return a Markdown daily-waste summary.
 
@@ -69,6 +72,22 @@ def build_daily_summary(
     lines.append(f"- CPU waste: {resource_report.total_cpu_waste_millicores:.0f} millicores")
     lines.append(f"- Memory waste: {resource_report.total_memory_waste_bytes // 1024**2} Mi")
     lines.append(f"- Monthly cost waste: ${cost_report.total_cost_waste.monthly_usd:.2f}\n")
+    measured_pods = sum(
+        pw.pod.actual.source is not MetricSource.ESTIMATED
+        for ns in resource_report.namespaces
+        for pw in ns.pod_waste
+    )
+    if degraded_errors:
+        lines.append(
+            "**Incomplete scan:** Some namespaces could not be read; totals exclude them. "
+            + "; ".join(degraded_errors)
+            + "\n"
+        )
+    if resource_report.total_pods and measured_pods < resource_report.total_pods:
+        lines.append(
+            f"**Metrics coverage:** {measured_pods}/{resource_report.total_pods} pods. "
+            "Unmeasured pods use requested capacity as an upper bound, not measured savings.\n"
+        )
     if cost_report.namespaces:
         lines.append("## Namespace Breakdown\n")
         lines.append("| Namespace | Monthly Waste ($) | Efficiency % |")
