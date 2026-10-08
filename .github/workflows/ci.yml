@@ -9,9 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Tag name to publish (for example v1.0.0)
+        description: Existing tag to publish (must match source version and checked commit)
         required: false
         type: string
+      publish_release:
+        description: Publish a new release and Docker tags after all checks pass
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # ── Fast feedback: lint + unit tests on every supported Python version ─
@@ -258,11 +263,47 @@ jobs:
         if: always()
         run: kind delete cluster --name kube-saver-smoke || true
 
-  # ── GitHub Release — tagged push or manual workflow_dispatch ──────────
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+  # Validate artifacts on every run; only an explicit main dispatch publishes.
+  release-check:
     runs-on: ubuntu-latest
     needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Install built wheel
+        run: python -m pip install dist/*.whl
+      - name: Verify source, artifacts, CLI, and requested tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PUBLISH_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+        shell: bash
+        run: |
+          args=()
+          if [[ "$PUBLISH_RELEASE" == "true" ]]; then
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          python scripts/verify_release.py "${args[@]}"
+          if [[ "$PUBLISH_RELEASE" == "true" ]]; then
+            git check-ref-format "refs/tags/$RELEASE_TAG"
+            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)" || {
+              echo 'Release tag must already point to the checked commit.' >&2
+              exit 1
+            }
+          fi
+
+  # GitHub Release: opt-in dispatch, verified existing tag, no historical updates.
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [release-check, smoke-wheel, smoke-docker]
     permissions:
       contents: write
     steps:
@@ -280,7 +321,7 @@ jobs:
 
       - name: Generate release notes
         env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           prev_tag=$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$RELEASE_TAG" | head -n 1 || true)
           {
@@ -309,19 +350,17 @@ jobs:
             fi
           } > release_notes.md
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          body_path: release_notes.md
-          files: |
-            dist/*
+      - name: Create new GitHub Release (fail if it already exists)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --title "$RELEASE_TAG" --notes-file release_notes.md
 
-  # ── Docker Hub publish — tagged push or manual workflow_dispatch ─────
+  # Publish Docker only after a new GitHub release was successfully created.
   docker:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [release, release-check, smoke-wheel, smoke-docker]
     permissions:
       contents: read
     steps:
@@ -348,5 +387,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver:${{ github.event.inputs.release_tag || github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver:${{ inputs.release_tag }}
             ${{ secrets.DOCKERHUB_USERNAME }}/kube-saver:latest
