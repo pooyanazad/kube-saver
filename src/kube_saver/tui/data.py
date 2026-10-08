@@ -67,6 +67,7 @@ def load_data(config: KubeSaverConfig) -> TUIData:
     try:
         client = K8sClient(
             context=config.kubeconfig_context,
+            namespace_filter=config.namespace_filter or None,
             exclude_namespaces=config.exclude_namespaces,
             timeouts=config.timeouts,
             retries=config.retries,
@@ -131,7 +132,9 @@ def load_data(config: KubeSaverConfig) -> TUIData:
             logger.warning("Cost analysis failed: %s", exc)
 
         try:
-            data.recommendations = generate_recommendations(data.resource_report, pricing)
+            data.recommendations = generate_recommendations(
+                data.resource_report, pricing, config=config
+            )
         except Exception as exc:
             logger.warning("Recommendations failed: %s", exc)
 

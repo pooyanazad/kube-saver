@@ -5,7 +5,8 @@ Provides the ``kube-saver doctor`` subcommand that checks:
 1. kubeconfig presence and parsability
 2. Active context selection
 3. Cluster API reachability
-4. Required RBAC permissions for the analyses kube-saver performs
+    4. Required RBAC permissions for the analyses kube-saver performs
+       (metrics permissions are optional)
 """
 
 from __future__ import annotations
@@ -32,13 +33,17 @@ class CheckResult:
     ok: bool
     detail: str = ""
     hint: str = ""
+    required: bool = True
 
     def render(self, use_color: bool) -> str:
-        marker = ("✓" if self.ok else "✗")
+        marker = "✓" if self.ok else "✗" if self.required else "!"
         if use_color:
             if self.ok:
                 marker = f"\033[32m{marker}\033[0m"
                 name_fmt = f"\033[1m{self.name}\033[0m"
+            elif not self.required:
+                marker = f"\033[33m{marker}\033[0m"
+                name_fmt = f"\033[1m\033[33m{self.name}\033[0m"
             else:
                 marker = f"\033[31m{marker}\033[0m"
                 name_fmt = f"\033[1m\033[31m{self.name}\033[0m"
@@ -64,7 +69,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(c.ok for c in self.checks)
+        return all(c.ok or not c.required for c in self.checks)
 
     def render(self, use_color: bool = True) -> str:
         lines: list[str] = []
@@ -88,10 +93,17 @@ class DoctorReport:
         lines.append("")
         if self.ok:
             summary = "All checks passed. kube-saver is ready to run."
+            optional_failed = sum(1 for c in self.checks if not c.ok)
+            if optional_failed:
+                summary = (
+                    "All required checks passed. "
+                    f"{optional_failed} optional check(s) unavailable; "
+                    "kube-saver can use request-based estimates."
+                )
             if use_color:
                 summary = f"\033[32m{summary}\033[0m"
         else:
-            failed = sum(1 for c in self.checks if not c.ok)
+            failed = sum(1 for c in self.checks if not c.ok and c.required)
             summary = f"{failed} check(s) failed. Resolve the issues above before running kube-saver."
             if use_color:
                 summary = f"\033[31m{summary}\033[0m"
@@ -119,6 +131,14 @@ REQUIRED_RBAC: list[tuple[str | None, str, str]] = [
     ("metrics.k8s.io", "nodes", "list"),
 ]
 
+# With an explicit namespace filter, kube-saver can scan through namespaced
+# Roles without permission to list Namespace or Node objects cluster-wide.
+SCOPED_RBAC: list[tuple[str | None, str, str]] = [
+    ("", "pods", "list"),
+    ("", "pods", "get"),
+    ("apps", "replicasets", "get"),
+]
+
 
 def _import_kubernetes() -> tuple[Any, Any, Any]:
     """Import the kubernetes client submodules.
@@ -142,6 +162,7 @@ def _authorize_with(
     verb: str,
     api_group: str | None = None,
     operation_timeout: float | None = None,
+    namespace: str | None = None,
 ) -> bool:
     """Run a ``SelfSubjectAccessReview`` to check if the current subject can ``verb`` ``kind``.
 
@@ -151,11 +172,10 @@ def _authorize_with(
             unreachable authorization API cannot hang the whole doctor run.
     """
     try:
-        resource_attrs = k8s_client.V1ResourceAttributes(
-            resource=kind,
-            verb=verb,
-            group=api_group or "",
-        )
+        attributes = {"resource": kind, "verb": verb, "group": api_group or ""}
+        if namespace is not None:
+            attributes["namespace"] = namespace
+        resource_attrs = k8s_client.V1ResourceAttributes(**attributes)
         spec = k8s_client.V1SelfSubjectAccessReviewSpec(
             resource_attributes=resource_attrs,
         )
@@ -190,6 +210,7 @@ def _resolve_kubeconfig_path() -> str | None:
 def run_doctor(
     context: str | None = None,
     timeouts: TimeoutConfig | None = None,
+    namespace_filter: list[str] | None = None,
 ) -> DoctorReport:
     """Execute every doctor check and return a ``DoctorReport``.
 
@@ -201,6 +222,9 @@ def run_doctor(
         timeouts: Optional ``TimeoutConfig`` applied to every API call so a
             slow or unreachable API server cannot hang diagnostics. Defaults
             to the built-in safe values when ``None``.
+        namespace_filter: Explicit namespaces for a Role-scoped scan. When
+            provided, RBAC checks are namespaced and cluster-wide Namespace
+            and Node permissions are not required.
     """
     report = DoctorReport()
     report.kubeconfig_path = _resolve_kubeconfig_path()
@@ -361,31 +385,31 @@ def run_doctor(
         return report
 
     # ── Check 5: required RBAC permissions ────────────────────────────────
-    for api_group, kind, verb in REQUIRED_RBAC:
-        display_name = f"{api_group}/{kind}" if api_group else kind
-        if _authorize_with(
-            k8s_client,
-            kind,
-            verb,
-            api_group=api_group or None,
-            operation_timeout=op_timeout,
-        ):
-            report.checks.append(
-                CheckResult(
-                    name=f"rbac {verb} {display_name}",
-                    ok=True,
-                    detail="allowed",
-                )
+    namespaces: list[str | None] = list(namespace_filter) if namespace_filter else [None]
+    checks = SCOPED_RBAC if namespace_filter else REQUIRED_RBAC
+    for namespace in namespaces:
+        for api_group, kind, verb in checks:
+            display_name = f"{api_group}/{kind}" if api_group else kind
+            name = f"rbac {verb} {display_name}"
+            if namespace is not None:
+                name += f" in {namespace}"
+            allowed = _authorize_with(
+                k8s_client,
+                kind,
+                verb,
+                api_group=api_group or None,
+                operation_timeout=op_timeout,
+                namespace=namespace,
             )
-        else:
             report.checks.append(
                 CheckResult(
-                    name=f"rbac {verb} {display_name}",
-                    ok=False,
-                    detail="denied",
+                    name=name,
+                    ok=allowed,
+                    detail="allowed" if allowed else "denied",
+                    required=api_group != "metrics.k8s.io",
                     hint=(
-                        f"grant the service account permission to {verb} {display_name} "
-                        "cluster-wide (e.g. via 'view' ClusterRole)"
+                        f"grant permission to {verb} {display_name}"
+                        + (f" in {namespace}" if namespace else " cluster-wide")
                     ),
                 )
             )

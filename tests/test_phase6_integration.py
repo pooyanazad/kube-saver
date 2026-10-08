@@ -213,6 +213,18 @@ class TestTuiDataIntegration:
         assert "integration-test-warning" in data.warnings
         assert data.loaded_at is not None
 
+    def test_tui_honors_namespace_filter(self, monkeypatch) -> None:
+        monkeypatch.setattr(tui_data, "K8sClient", _FakeK8sClient)
+        monkeypatch.setattr(tui_data, "RuntimeCollector", _FakeRuntimeCollector)
+
+        cfg = load_config()
+        cfg.namespace_filter = ["team-a"]
+        cfg.exclude_namespaces = set()
+        data = tui_data.load_data(cfg)
+
+        assert data.resource_report is not None
+        assert [ns.namespace.name for ns in data.resource_report.namespaces] == ["team-a"]
+
     def test_load_data_connection_failure(self, monkeypatch) -> None:
         monkeypatch.setattr(tui_data, "K8sClient", _FailingK8sClient)
         cfg = load_config()

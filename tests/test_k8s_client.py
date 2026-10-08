@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from kube_saver.collectors.k8s_client import (
+    ApiException,
     K8sClient,
     _parse_cpu_to_millicores,
     _parse_memory_to_bytes,
@@ -163,3 +164,18 @@ def test_resolves_replicaset_to_deployment_and_caches_result() -> None:
     assert first == ("Deployment", "api")
     assert second == first
     apps.read_namespaced_replica_set.assert_called_once()
+
+
+def test_explicit_namespace_filter_works_without_cluster_namespace_permission() -> None:
+    core = MagicMock()
+    core.list_namespace.side_effect = ApiException(status=403, reason="Forbidden")
+    client = K8sClient(
+        namespace_filter=["prod", "staging"],
+        exclude_namespaces={"staging"},
+    )
+    client._core_api = core
+    client._connected = True
+
+    namespaces = client.get_namespaces()
+
+    assert [ns.name for ns in namespaces] == ["prod"]

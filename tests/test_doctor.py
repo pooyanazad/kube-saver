@@ -278,6 +278,26 @@ class TestRunDoctorSuccess:
         assert REQUIRED_RBAC[0][1] in kinds_passed
         assert REQUIRED_RBAC[0][2] in verbs_passed
 
+    def test_namespace_filter_checks_namespaced_permissions(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        cfg = tmp_path / "config"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+        fakes = _install_fake_kubernetes(monkeypatch)
+
+        report = run_doctor(namespace_filter=["prod"])
+
+        assert report.ok
+        names = {check.name for check in report.checks}
+        assert "rbac list pods in prod" in names
+        assert "rbac get apps/replicasets in prod" in names
+        assert "rbac list namespaces" not in names
+        assert all(
+            call.kwargs.get("namespace") == "prod"
+            for call in fakes["client"].V1ResourceAttributes.call_args_list
+        )
+
     def test_rbac_denied(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         cfg = tmp_path / "config"
         cfg.write_text("apiVersion: v1\n")
@@ -294,6 +314,26 @@ class TestRunDoctorSuccess:
         assert not report.ok
         denied = [c for c in report.checks if c.name.startswith("rbac") and not c.ok]
         assert denied, "at least one RBAC check should fail"
+
+    def test_missing_metrics_permission_is_optional(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        cfg = tmp_path / "config"
+        cfg.write_text("apiVersion: v1\n")
+        monkeypatch.setenv("KUBECONFIG", str(cfg))
+        fakes = _install_fake_kubernetes(monkeypatch)
+        statuses = [True] * (len(REQUIRED_RBAC) - 2) + [False, False]
+        fakes["client"].AuthorizationV1Api.return_value.create_self_subject_access_review.side_effect = [
+            MagicMock(status=MagicMock(allowed=allowed)) for allowed in statuses
+        ]
+
+        report = run_doctor()
+
+        assert report.ok
+        assert "optional check(s) unavailable" in report.render(use_color=False)
+        metrics = [c for c in report.checks if "metrics.k8s.io" in c.name]
+        assert len(metrics) == 2
+        assert all(not c.ok and not c.required for c in metrics)
 
 
 # ── CLI integration ───────────────────────────────────────────────────────

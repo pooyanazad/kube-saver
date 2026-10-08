@@ -365,6 +365,18 @@ class K8sClient:
                 retry_config=self.retries,
             )
         except ApiException as exc:
+            if self.namespace_filter and exc.status == 403:
+                # A namespaced Role cannot list Namespace objects. An explicit
+                # filter is enough to enumerate the namespaces to scan; pod
+                # listing will still verify access to each of them.
+                logger.info(
+                    "Cannot list namespaces; scanning explicit namespace_filter"
+                )
+                return [
+                    NamespaceInfo(name=name)
+                    for name in self.namespace_filter
+                    if name not in self.exclude_namespaces
+                ]
             logger.warning("Cannot list namespaces (RBAC?): %s", exc)
             return []
         except Exception as exc:

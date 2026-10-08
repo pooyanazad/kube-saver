@@ -4,6 +4,7 @@
 #
 # Replace MY-NAMESPACE with each target namespace.
 # This gives kube-saver read-only access only within the specified namespace.
+# Set namespace_filter: [MY-NAMESPACE] in .kube-saver.yaml before running.
 #
 # Note: node-level and cluster-wide totals cannot be reported with this scope.
 
@@ -30,6 +31,9 @@ rules:
     verbs: ["list", "get"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["list", "get"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
     verbs: ["list", "get"]
 
 ---

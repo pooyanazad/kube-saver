@@ -390,7 +390,14 @@ def doctor(context: str | None) -> None:
 
     config = load_config()
     use_color = sys.stdout.isatty()
-    report = run_doctor(context=context, timeouts=config.timeouts)
+    if config.namespace_filter:
+        report = run_doctor(
+            context=context,
+            timeouts=config.timeouts,
+            namespace_filter=config.namespace_filter,
+        )
+    else:
+        report = run_doctor(context=context, timeouts=config.timeouts)
     click.echo(report.render(use_color=use_color))
     if not report.ok:
         raise SystemExit(exitcodes.GENERAL_ERROR)
