@@ -35,9 +35,10 @@ kube-saver report -o cost-report.html
 
 | Flag | Description |
 |---|---|
-| `-o, --output PATH` | Output HTML file path (required) |
+| `-o, --output PATH` | Output HTML file path (default: `kube-saver-report.html`) |
 | `--json PATH` | Also write a JSON summary alongside the HTML |
-| `--config PATH` | Use a non-default config file |
+
+A completely failed pod scan exits with code 4 and writes no report. A partial scan writes a report with a warning and marks the JSON as degraded.
 
 The HTML is fully portable, no CDN, no external assets, works in any browser offline.
 
@@ -73,7 +74,9 @@ kube-saver notify -d ./alerts --threshold 250
 | Flag | Description |
 |---|---|
 | `-d, --dir PATH` | Output directory (created if missing) |
-| `--threshold USD` | Monthly USD threshold above which a spike alert is written (default: 500) |
+| `--threshold USD` | Monthly USD threshold above which a spike alert is written (default: 100) |
+
+Spike alerts require current usage metrics for every scanned pod and a complete scan. The daily summary still records request-based estimates when metrics are unavailable.
 
 ### `kube-saver serve`
 
@@ -87,8 +90,9 @@ kube-saver serve -p 8080 -b 127.0.0.1
 |---|---|
 | `-p, --port PORT` | TCP port (default: 8080) |
 | `-b, --bind HOST` | Bind address (default: 127.0.0.1, loopback only) |
+| `--expose` | Confirm binding to a non-loopback address |
 
-The API is intentionally minimal: `GET /health` and `GET /report` (latest snapshot). It is not an OAuth-aware public API. If you bind it to `0.0.0.0` you are responsible for putting it behind a reverse proxy with auth, see [Safety & trust](safety.md#http-api).
+The API provides `GET /healthz`, `/readyz`, `/api/v1/report`, and `/openapi.json`. Each report request scans the cluster. It is not an OAuth-aware public API. Binding to a non-loopback address requires `--expose`; put it behind a reverse proxy with auth, see [Safety & trust](safety.md#http-api).
 
 ### `kube-saver version`
 
@@ -97,6 +101,10 @@ Print the installed version and exit.
 ```bash
 kube-saver version
 ```
+
+### `kube-saver doctor`
+
+Check kubeconfig, connectivity, and RBAC. Use `--context NAME` to check a specific context. If `namespace_filter` is configured, RBAC checks target those namespaces. Missing metrics permissions are reported as optional because request-based estimates still work.
 
 ---
 
@@ -144,24 +152,23 @@ All commands use stable exit codes for automation:
 | `0` | Success |
 | `1` | Generic failure (see stderr) |
 | `2` | Invalid configuration |
-| `3` | Cluster unreachable |
-| `4` | Insufficient RBAC permissions |
-| `5` | Runtime source unavailable (eBPF / metrics-server), non-fatal; falls back to estimates |
+| `3` | Cluster unreachable or API authentication failed |
+| `4` | Analysis or pod collection failed |
 
 ---
 
-## Global flags
+## Context and configuration
 
-These work on every subcommand:
+The CLI has no global options. Set these environment variables before a command, or use the config files described in [Configuration](configuration.md):
 
-| Flag | Description |
+| Setting | Description |
 |---|---|
-| `--config PATH` | Path to a config YAML |
-| `--context NAME` | kubeconfig context to use |
-| `--kubeconfig PATH` | Path to kubeconfig (same as `KUBECONFIG` env var) |
-| `--log-level LEVEL` | `debug` / `info` / `warn` / `error` (default: `info`) |
-| `--no-color` | Disable ANSI colors in output |
-| `--help` | Show help for the current command |
+| `KUBE_SAVER_CONTEXT` | kubeconfig context for scans and the TUI |
+| `KUBECONFIG` | kubeconfig file path |
+| `~/.kube-saver/config.yaml` | User config file |
+| `.kube-saver.yaml` | Project config file |
+
+`doctor` alone accepts `-c, --context` to check a named context. Every command accepts `--help`.
 
 ---
 

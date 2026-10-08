@@ -96,7 +96,7 @@ kube-saver needs read access to the API. Tested against:
 | -------------------------------------------- | --------- |
 | Cluster-admin (no restrictions)              | works     |
 | Read-only cluster role                       | works     |
-| Namespace-scoped read role                   | works     |
+| Namespace-scoped read role                   | works with `namespace_filter` |
 | Tightly restricted (specific verbs only)     | works, `doctor` reports missing verbs |
 
 For exact RBAC requirements, see [docs/safety.md](safety.md#read-only-rbac-recipe).

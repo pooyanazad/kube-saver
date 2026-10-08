@@ -20,32 +20,31 @@ This document explains what kube-saver will never do, how it protects your workl
 - Send data to a third-party service or API
 - Require a cloud account, token, or hosted backend
 - Crash because metrics-server is unavailable
-- Recommend a resource value below what your pod is currently using in production
+- Generate a right-sizing recommendation from request-only estimates
 
 ---
 
 ## Recommendation safety
 
-The right-sizing engine applies these guardrails:
+The right-sizing engine applies these guardrails to the current metrics sample:
 
 | Guardrail | What it prevents |
 |---|---|
-| **Floor: never below current usage** | Recommendations never suggest a value lower than the pod's peak observed usage |
-| **Headroom buffer** | A configurable safety margin is added to observed usage (default: 20%) |
-| **Stateful workload detection** | StatefulSets and pods with PVCs get a larger safety margin |
-| **Critical namespace protection** | Namespaces matching your `critical_namespaces` config list get a larger buffer |
-| **Minimum resource floor** | CPU and memory recommendations are clamped to minimums (50m CPU, 64Mi memory) |
-| **Confidence score** | Every recommendation has a confidence level, only high-confidence ones appear in PR plans |
+| **Measured usage required** | Missing metrics do not produce recommendations |
+| **Current-sample headroom** | CPU suggestions use 1.5× observed usage; memory uses 1.2× |
+| **Minimum resource floor** | Suggestions are at least 50m CPU and 64Mi memory |
+| **Single-container workloads** | Pods with sidecars are skipped because pod metrics cannot be split safely |
+| **Protected namespaces and exclusions** | Configured namespaces, labels, and annotations suppress recommendations |
 
-These guardrails are not optional. They are baked into the recommendation engine and cannot be disabled in config.
+The tool uses a current snapshot, not historical peak usage. Review recommendations against workload bursts and service objectives before applying the generated script.
 
 If you want to suppress recommendations for specific workloads, use the exclusion config:
 
 ```yaml
 exclude_labels:
-  - app.kubernetes.io/part-of: database
+  app.kubernetes.io/part-of: database
 exclude_annotations:
-  - kube-saver.io/ignore: "true"
+  kube-saver.io/ignore: "true"
 ```
 
 ---
@@ -81,14 +80,14 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: kube-saver
-    namespace: kube-system
+    namespace: kube-saver
 roleRef:
   kind: ClusterRole
   name: kube-saver-reader
   apiGroup: rbac.authorization.k8s.io
 ```
 
-For namespace-scoped access, replace `ClusterRole` / `ClusterRoleBinding` with `Role` / `RoleBinding` in each target namespace.
+For namespace-scoped access, use a `Role` / `RoleBinding` in each target namespace and set `namespace_filter` to those names. See [RBAC permissions](rbac.md#namespace-scoped-deployment).
 
 > **Note:** The `metrics.k8s.io` group is only needed if metrics-server is running. kube-saver works without it, it just falls back to estimates.
 
@@ -130,7 +129,7 @@ kube-saver never logs or exports:
 - Pod environment variables
 - Secret objects or their data
 
-The `doctor` command redacts all connection metadata. The config dump command (`kube-saver config --show`) redacts sensitive fields before printing.
+The `doctor` command reports the kubeconfig path, active context, and server version, but does not print credentials.
 
 ---
 

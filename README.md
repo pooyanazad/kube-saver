@@ -35,6 +35,8 @@ Turns invisible cluster waste into visible dollar amounts you can act on in one 
 - **Markdown spike alerts**, daily summaries written to local files, no webhook needed
 - **Two safe runtime modes**: metrics-server usage → request-based estimates
 
+Cost figures are projections from configured rates and a point-in-time scan. Without metrics-server, request-based figures are upper bounds; they do not trigger right-sizing recommendations or spike alerts.
+
 ---
 
 ## Screenshots

@@ -56,8 +56,8 @@ What to confirm:
 - `kube-saver tui` launches and renders without errors
 - `kube-saver report -o /tmp/report.html` produces a report > 1KB
 - `kube-saver report --json /tmp/report.json` is valid JSON
-- `kube-saver pr-plan --out-dir /tmp/pr` produces patches
-- `kube-saver notify --out-dir /tmp/notify` produces alerts
+- `kube-saver pr-plan --dir /tmp/pr` produces patches when measured usage supports recommendations
+- `kube-saver notify --dir /tmp/notify` produces a summary, and an alert when measured waste exceeds the threshold
 
 ## 2. Managed cloud cluster
 
@@ -101,38 +101,11 @@ in production accidentally.
 This is the most likely place for surprises. Real users do not run as
 cluster-admin, so we should not either.
 
-Set up a minimal RBAC role:
-
-```yaml
-# rbac-test.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: kube-saver-test
-  namespace: default
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: kube-saver-test
-  namespace: default
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "services", "configmaps", "namespaces", "nodes", "persistentvolumes"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps"]
-    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["metrics.k8s.io"]
-    resources: ["nodes", "pods"]
-    verbs: ["get", "list"]
-```
-
-Apply it locally on `kind`:
+Use `manifests/namespace-scoped-rbac.yaml` with `MY-NAMESPACE` replaced by the test namespace. Set the same name under `namespace_filter` in `.kube-saver.yaml`. Apply it locally on `kind`:
 
 ```bash
-kubectl apply -f rbac-test.yaml
-kubectl create token kube-saver-test -n default > /tmp/kube-saver-token
+kubectl apply -f manifests/namespace-scoped-rbac.yaml
+kubectl create token kube-saver -n MY-NAMESPACE > /tmp/kube-saver-token
 ```
 
 Use the restricted context:
@@ -144,8 +117,8 @@ KUBECONFIG=/tmp/restricted.kubeconfig ./scripts/verify-install.sh
 
 What to confirm:
 
-- `doctor` reports no permission errors for the resources we expect to read
-- `report` produces output even with no namespace access (cluster-scoped)
+- `doctor` reports no permission errors for the selected namespace
+- `report` exits 4 without writing an empty report when no namespace is readable
 - `report` errors gracefully if we deny a specific resource (`get pods`)
 - The error message tells the user which RBAC verb is missing
 - No crash, no stack trace, no silent failure
@@ -172,7 +145,7 @@ If anything fails, do not tag the release until it's fixed.
 - `kube-saver doctor` reports all-green on at least one environment
 - The generated HTML report opens in a browser without errors
 - A real cluster's cost numbers look right (sanity check, not a gold master)
-- No new exceptions appear in `--log-level debug` output
+- No new exceptions appear on stderr during the CLI checks
 
 ## When to skip an environment
 

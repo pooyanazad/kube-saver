@@ -44,10 +44,10 @@ hdr() { printf "\n\033[1m== %s ==\033[0m\n" "$1"; }
 hdr "1. Python version"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PY_VERSION="$($PYTHON_BIN -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-if [[ "$PY_VERSION" == "3.10" || "$PY_VERSION" == "3.11" || "$PY_VERSION" == "3.12" ]]; then
+if [[ "$PY_VERSION" == "3.10" || "$PY_VERSION" == "3.11" || "$PY_VERSION" == "3.12" || "$PY_VERSION" == "3.13" ]]; then
   ok "Python $PY_VERSION"
 else
-  bad "Python $PY_VERSION (need 3.10, 3.11, or 3.12)"
+  bad "Python $PY_VERSION (need 3.10 through 3.13)"
 fi
 
 hdr "2. CLI is on PATH"
@@ -90,12 +90,7 @@ DOCTOR_OUT="$TMP_DIR/doctor.txt"
 if kube-saver doctor >"$DOCTOR_OUT" 2>&1; then
   ok "kube-saver doctor reports all-green"
 else
-  DOCTOR_EXIT=$?
-  if grep -q "kubeconfig" "$DOCTOR_OUT" 2>/dev/null; then
-    ok "kube-saver doctor exits $DOCTOR_EXIT (no kubeconfig — expected outside cluster)"
-  else
-    bad "kube-saver doctor exited $DOCTOR_EXIT unexpectedly"
-  fi
+  bad "kube-saver doctor failed (see $DOCTOR_OUT)"
 fi
 
 hdr "6. Generate a real HTML report"
@@ -125,7 +120,7 @@ fi
 
 hdr "8. notify command writes files"
 NOTIFY_DIR="$TMP_DIR/notify"
-if kube-saver notify --out-dir "$NOTIFY_DIR" >/dev/null 2>&1; then
+if kube-saver notify --dir "$NOTIFY_DIR" >/dev/null 2>&1; then
   if [ -d "$NOTIFY_DIR" ] && [ "$(ls -A "$NOTIFY_DIR" 2>/dev/null)" ]; then
     ok "notify wrote $(ls "$NOTIFY_DIR" | wc -l) file(s)"
   else
@@ -137,7 +132,7 @@ fi
 
 hdr "9. pr-plan command writes files"
 PR_DIR="$TMP_DIR/pr-plan"
-if kube-saver pr-plan --out-dir "$PR_DIR" >/dev/null 2>&1; then
+if kube-saver pr-plan --dir "$PR_DIR" >/dev/null 2>&1; then
   if [ -d "$PR_DIR" ] && [ "$(ls -A "$PR_DIR" 2>/dev/null)" ]; then
     ok "pr-plan wrote $(ls "$PR_DIR" | wc -l) file(s)"
   else
@@ -154,7 +149,7 @@ if kube-saver serve --port 18765 --bind 127.0.0.1 >"$SVC_LOG" 2>&1 &
 then
   SVC_PID=$!
   sleep 2
-  if curl -sf http://127.0.0.1:18765/ >/dev/null 2>&1; then
+  if curl -sf http://127.0.0.1:18765/healthz >/dev/null 2>&1; then
     ok "serve responded on 127.0.0.1:18765"
   else
     bad "serve did not respond"
@@ -170,7 +165,7 @@ fi
 if [ "$RUN_DOCKER" -eq 1 ]; then
   hdr "11. Docker image runs"
   if command -v docker >/dev/null 2>&1; then
-    if docker run --rm pooyanazad/kube-saver:latest --version >/dev/null 2>&1; then
+    if docker run --rm pooyanazad/kube-saver:latest version >/dev/null 2>&1; then
       ok "Docker image runs"
     else
       bad "Docker image failed (do you have a kubeconfig mounted?)"

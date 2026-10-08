@@ -48,17 +48,11 @@ These files are designed to be consumed by:
 - A CI pipeline that archives them as artifacts
 - A Git-based ops workflow that commits them for audit
 
-### JSON / YAML / Helm values
+### JSON
 
-Standard formats, no external dependencies:
+Standard JSON, no hosted dependency:
 
 - `--json PATH` on the report command writes a JSON summary
-- `kube-saver export --format yaml` writes a YAML snapshot
-- `kube-saver export --format helm` writes Helm values for the recommended resource changes
-
-### Prometheus metrics
-
-Standard Prometheus exposition format at `GET /metrics` when the HTTP server is running, or via the `kube-saver metrics` command. Ready to be scraped by any Prometheus-compatible system.
 
 ### HTTP API (`kube-saver serve`)
 

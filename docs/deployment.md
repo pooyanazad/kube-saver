@@ -2,7 +2,7 @@
 
 Three options for running kube-saver with the official Docker image, depending on where your kubeconfig lives.
 
-The image is at `pooyanazad/kube-saver` on Docker Hub. The `kube-saver` user runs as UID 65532 inside the container.
+The image is at `pooyanazad/kube-saver` on Docker Hub. The container runs as an unprivileged `kube-saver` user.
 
 ---
 
@@ -53,10 +53,10 @@ Use the cluster-scoped manifest:
 kubectl apply -f manifests/cluster-scoped-rbac.yaml
 ```
 
-Or the namespace-scoped one for limited access:
+For a namespace-scoped role, replace `MY-NAMESPACE` in the manifest, apply it, and set the same name in `.kube-saver.yaml` as `namespace_filter`. The config file must be available inside the container at `/app/.kube-saver.yaml`:
 
 ```bash
-kubectl apply -f manifests/namespace-scoped-rbac.yaml -n my-app
+kubectl apply -f manifests/namespace-scoped-rbac.yaml
 ```
 
 ### Run as a Job

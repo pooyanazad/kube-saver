@@ -6,12 +6,12 @@ All kube-saver configuration is optional. The tool has safe, production-friendly
 
 ## Config file location
 
-kube-saver looks for config in this order (first match wins):
+kube-saver merges config in this order, with later values taking precedence:
 
-1. `--config PATH` flag
-2. `KUBE_SAVER_CONFIG` environment variable
-3. `~/.kube-saver/config.yaml`
-4. `.kube-saver.yaml` in the current directory
+1. Built-in defaults
+2. `~/.kube-saver/config.yaml`
+3. `.kube-saver.yaml` in the current directory
+4. Supported `KUBE_SAVER_*` environment variables
 
 Generate a full default config:
 
@@ -79,9 +79,16 @@ exclude_namespaces:
   - kube-public
   - kube-node-lease
 exclude_labels:
-  - app.kubernetes.io/part-of: monitoring
+  app.kubernetes.io/part-of: monitoring
 exclude_annotations:
-  - kube-saver.io/ignore: "true"
+  kube-saver.io/ignore: "true"
+```
+
+For a Role limited to specific namespaces, set `namespace_filter` to those names. This avoids needing cluster-wide permission to list Namespace objects:
+
+```yaml
+namespace_filter:
+  - my-app
 ```
 
 ---
@@ -96,8 +103,9 @@ alerts:
   critical_waste_ratio: 0.8      # critical at 80% waste
   warning_monthly_usd: 100
   critical_monthly_usd: 500
-  spike_threshold_usd: 250       # used by --threshold in notify command
 ```
+
+`notify --threshold` is a command option (default: 100 USD), not a config key.
 
 ---
 
@@ -123,13 +131,11 @@ tui:
 
 ## HTTP API server
 
-```yaml
-server:
-  host: 127.0.0.1                 # loopback only by default
-  port: 8080
+```bash
+kube-saver serve --bind 127.0.0.1 --port 8080
 ```
 
-The server defaults to loopback. Do **not** change `host` to `0.0.0.0` unless you have a reverse proxy with auth in front of it. See [Safety & trust](safety.md#http-api).
+These are CLI options, not config keys. The server defaults to loopback. See [Safety & trust](safety.md#http-api) before exposing it.
 
 ---
 
@@ -178,22 +184,21 @@ If a call times out, kube-saver treats it like any other API failure: it logs a 
 
 ## Environment variables
 
-Every config key has a runtime environment variable override. Environment variables take precedence over config file values.
+Only the environment variables below are supported. They take precedence over config file values.
 
 | Env var | Config key | Example |
 |---|---|---|
-| `KUBE_SAVER_CONFIG` | (config file path) | `/etc/kube-saver/config.yaml` |
 | `KUBE_SAVER_CURRENCY` | `currency` | `eur` |
 | `KUBE_SAVER_EXCHANGE_RATE_FROM_USD` | `exchange_rate_from_usd` | `0.92` |
 | `KUBE_SAVER_CPU_PER_CORE` | `pricing.cpu_per_core_hour_usd` | `0.05` |
 | `KUBE_SAVER_MEM_PER_GB` | `pricing.memory_per_gb_hour_usd` | `0.006` |
-| `KUBE_SAVER_CLOUD_PROVIDER` | `cloud_provider` | `aws` |
-| `KUBE_SAVER_PROVIDER_TIER` | `provider_tier` | `spot` |
-| `KUBE_SAVER_LOG_LEVEL` | (global) | `debug` |
+| `KUBE_SAVER_PROVIDER` | `cloud_provider` | `aws` |
+| `KUBE_SAVER_TIER` | `provider_tier` | `spot` |
+| `KUBE_SAVER_CONTEXT` | `kubeconfig_context` | `staging` |
 | `KUBE_SAVER_TIMEOUT_CONNECT` | `timeouts.connect_seconds` | `5` |
 | `KUBE_SAVER_TIMEOUT_READ` | `timeouts.read_seconds` | `20` |
 | `KUBE_SAVER_TIMEOUT_OPERATION` | `timeouts.operation_seconds` | `45` |
-| `KUBECONFIG` | `--kubeconfig` flag | `~/.kube/config` |
+| `KUBECONFIG` | Kubernetes client config path | `~/.kube/config` |
 
 ---
 

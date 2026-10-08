@@ -49,7 +49,7 @@ BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 3. Does the context match what kube-saver is using?
    ```bash
-   kube-saver --context <name>
+   KUBE_SAVER_CONTEXT=<name> kube-saver doctor --context <name>
    ```
 
 4. Do you have the required RBAC permissions? See [Safety & trust](safety.md#rbac).
@@ -93,7 +93,7 @@ BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 - Run `kube-saver doctor` to see which specific resource is denied.
 - Apply the minimal RBAC manifest from [Safety & trust](safety.md#rbac).
-- For read-only namespace-scoped access, use a `Role` + `RoleBinding` instead of a `ClusterRole`.
+- For read-only namespace-scoped access, use a `Role` + `RoleBinding` and set `namespace_filter` to the allowed namespaces.
 
 ---
 
@@ -105,11 +105,7 @@ BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 - Check which runtime source is active; estimates are less accurate than metrics-server.
 - If a workload is intentionally bursty, annotate it with `kube-saver.io/ignore: "true"` to exclude it from recommendations.
-- Adjust the headroom buffer in config if your workloads need more or less margin:
-  ```yaml
-  recommendations:
-    headroom_buffer_ratio: 0.3   # 30% headroom instead of 20%
-  ```
+- Review the current request and observed usage in the report before applying a plan. The recommendation engine currently uses fixed headroom factors.
 
 ---
 

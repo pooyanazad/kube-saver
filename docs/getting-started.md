@@ -64,7 +64,7 @@ kubectl cluster-info
 kube-saver
 ```
 
-If you want demo data to play with, the repo ships a manifest at `demo/big-demo.yaml` that creates 7 namespaces with over-provisioned workloads, enough to populate the dashboard with realistic numbers.
+To try it locally, use any Kubernetes cluster with at least one workload that sets CPU and memory requests. Install metrics-server to see measured waste and right-sizing recommendations.
 
 ### AWS EKS
 
@@ -85,7 +85,7 @@ kube-saver
 If your kubeconfig has multiple contexts, pass the one you want:
 
 ```bash
-kube-saver --context staging-cluster
+KUBE_SAVER_CONTEXT=staging-cluster kube-saver
 ```
 
 ### Restricted / read-only RBAC
@@ -118,6 +118,8 @@ If you want a TUI session:
 #   q         quit
 kube-saver
 ```
+
+If metrics-server is unavailable, the cost figures represent an upper bound based on requests. They are not measured savings, and no right-sizing recommendations or spike alert is issued from those estimates.
 
 If you want a PR-ready plan:
 

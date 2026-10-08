@@ -55,7 +55,7 @@ roleRef:
 Apply it:
 
 ```bash
-kubectl apply -f manifests/cluster-scoped.yaml
+kubectl apply -f manifests/cluster-scoped-rbac.yaml
 ```
 
 ---
@@ -63,6 +63,12 @@ kubectl apply -f manifests/cluster-scoped.yaml
 ## Namespace-scoped deployment
 
 Use a `Role` + `RoleBinding` per namespace when you want to limit kube-saver to specific namespaces.
+Set `namespace_filter` in `.kube-saver.yaml` to those namespace names; this lets kube-saver scan them without cluster-wide permission to list Namespace objects.
+
+```yaml
+namespace_filter:
+  - MY-NAMESPACE
+```
 
 ```yaml
 apiVersion: v1
@@ -88,6 +94,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
     verbs: ["list", "get"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["list", "get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -104,7 +113,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-> Replace `MY-NAMESPACE` with each target namespace. The `nodes` and `namespaces` resources are cluster-scoped, so namespace-scoped scans cannot report node-level or cluster-wide totals.
+> Replace `MY-NAMESPACE` with each target namespace in the manifest and config. Node totals and namespace labels need cluster-wide permissions, so they are unavailable in this mode. `doctor` checks the selected namespaces when `namespace_filter` is set.
 
 ---
 
