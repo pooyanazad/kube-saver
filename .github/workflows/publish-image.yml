@@ -1,0 +1,108 @@
+name: Publish metadata image
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: Successful main ci run for this exact main commit (artifact must not be expired)
+        required: true
+        type: string
+      publish_image:
+        description: Publish the tested image under metadata-COMMIT only
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: kube-saver-metadata-image
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify main and the successful source workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/main && "$CI_RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID" > ci-run.json
+          python - <<'PY'
+          import json, os
+          run = json.load(open("ci-run.json"))
+          assert run["repository"]["full_name"] == os.environ["GITHUB_REPOSITORY"]
+          assert run["head_sha"] == os.environ["GITHUB_SHA"]
+          assert run["head_branch"] == "main"
+          assert run["path"] == ".github/workflows/ci.yml"
+          assert run["event"] in ("push", "workflow_dispatch")
+          assert run["status"] == "completed" and run["conclusion"] == "success"
+          PY
+          current_main=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          [[ "$current_main" == "$GITHUB_SHA" ]]
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: smoke-image
+          path: tested-image
+          run-id: ${{ inputs.ci_run_id }}
+          github-token: ${{ github.token }}
+      - name: Validate the exact tested image
+        run: |
+          gzip -dc tested-image/smoke-image.tar.gz | docker load
+          docker run --rm kube-saver:smoke version
+          image_version=$(python -c "from pathlib import Path; from scripts.verify_release import source_version; print(source_version(Path('src/kube_saver/version.py').read_text()))")
+          [[ "$(docker run --rm kube-saver:smoke version)" == "kube-saver $image_version" ]]
+          docker image inspect kube-saver:smoke --format '{{json .Config.Labels}}' > labels.json
+          python -m scripts.verify_image_metadata labels.json --version "$image_version" --revision "$GITHUB_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-metadata-image
+          path: tested-image/smoke-image.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  publish:
+    if: inputs.publish_image && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: docker-hub
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-metadata-image
+          path: tested-image
+      - name: Load verified image
+        run: gzip -dc tested-image/smoke-image.tar.gz | docker load
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish a new commit-specific image without replacing release tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          [[ "$DOCKERHUB_USERNAME" == pooyanazad ]]
+          current_main=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          [[ "$current_main" == "$GITHUB_SHA" ]]
+          image="pooyanazad/kube-saver:metadata-$GITHUB_SHA"
+          if docker manifest inspect "$image" > existing-manifest.json 2> manifest-error.txt; then
+            echo "::error::The commit-specific tag already exists; refusing to overwrite it."
+            exit 1
+          fi
+          if ! grep -Eq 'manifest unknown|no such manifest' manifest-error.txt; then
+            cat manifest-error.txt >&2
+            exit 1
+          fi
+          docker tag kube-saver:smoke "$image"
+          docker push "$image"
+          docker manifest inspect "$image" > published-manifest.json
+          echo "Published $image" >> "$GITHUB_STEP_SUMMARY"

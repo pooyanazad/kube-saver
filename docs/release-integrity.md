@@ -72,3 +72,23 @@ python scripts/verify_release.py --dist-dir dist --require-checksums
 
 This script only reads local files and invokes the version command. It does not
 create a tag, upload assets, or contact a publishing API.
+## Artifact Hub image metadata
+
+CI stamps the tested image with its actual build-start timestamp, exact source
+commit, package version, MIT license, description, documentation URL, and a raw
+README URL pinned to that source commit. Image-label validation runs before the
+kind smoke test artifact is saved.
+
+The separate **Publish metadata image** workflow is manual and defaults to
+validation only. It accepts a successful main CI run for the exact current main
+commit, loads that run's tested image, and revalidates its labels and CLI version.
+With explicit publication enabled, it pushes only a new
+`pooyanazad/kube-saver:metadata-COMMIT` tag. It refuses an existing tag and does not
+update `latest`, version tags, Git tags, or GitHub releases. Missing/expired
+artifacts, a changed main head, uncertain registry errors, or failed CI stop it.
+
+Before publication, the owner must configure the `docker-hub` GitHub environment
+to allow only main and require owner approval where the repository plan supports
+it. Existing Docker Hub secrets are reused. Register the verified new image tag
+in Artifact Hub only after the publication workflow and registry inspection
+succeed; do not list the old unlabeled v2.0.0 image as metadata-ready.
