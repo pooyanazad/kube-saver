@@ -56,12 +56,20 @@ def generate_recommendations(
         # would not independently generate a recommendation.
         if any(
             pw.pod.actual.source is MetricSource.ESTIMATED
+            or not all(math.isfinite(value) and value >= 0 for value in (
+                pw.pod.actual.cpu_millicores, pw.pod.actual.memory_bytes,
+                pw.pod.resources.cpu_millicores_request,
+                pw.pod.resources.memory_bytes_request,
+            ))
+            or not pw.pod.workload_name
             or len(pw.pod.containers) != 1
             or (config and config.is_pod_excluded(
                 pw.pod.name, pw.pod.labels, pw.pod.annotations
             ))
             for pw in observations
         ):
+            continue
+        if any(not pw.pod.containers[0].name for pw in observations):
             continue
         if len({pw.pod.containers[0].name for pw in observations}) != 1:
             continue
@@ -167,7 +175,6 @@ def _consolidate_replicas(
         grouped.setdefault(key, []).append(rec)
 
     consolidated: list[Recommendation] = []
-    confidence_rank = {"high": 0, "medium": 1, "low": 2}
     for group in grouped.values():
         selected = max(group, key=lambda rec: _value_in_base_units(rec.suggested_value))
         cpu = selected.resource_type.startswith("cpu")
@@ -178,6 +185,10 @@ def _consolidate_replicas(
             else pw.pod.resources.memory_bytes_request
             for pw in observations
         ]
+        # Different requests can indicate a rollout or admission mutation. We
+        # cannot infer the current controller template from those pod samples.
+        if len(set(requests)) != 1:
+            continue
         # Never turn a downsize candidate into an increase for another replica.
         if any(suggested >= request for request in requests):
             continue
@@ -192,9 +203,15 @@ def _consolidate_replicas(
             selected.estimated_savings = pricing.cost_from_resources(total_saved, 0)
         else:
             selected.estimated_savings = pricing.cost_from_resources(0, int(total_saved))
-        selected.confidence = max(
-            (rec.confidence for rec in group),
-            key=lambda confidence: confidence_rank.get(confidence, 3),
+        weakest_ratio = min(
+            pw.cpu_waste_ratio if cpu else pw.memory_waste_ratio
+            for pw in observations
+        )
+        selected.confidence = _confidence_from_ratio(weakest_ratio)
+        resource = "CPU" if cpu else "Memory"
+        selected.reason = (
+            f"{resource} maximum observed utilization is {1 - weakest_ratio:.0%}; "
+            "current-sample sizing only"
         )
         if len(observations) > 1:
             selected.reason += f"; conservative maximum across {len(observations)} replicas"

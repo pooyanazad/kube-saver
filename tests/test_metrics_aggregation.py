@@ -61,7 +61,7 @@ class _FakeCustomObjectsApi:
             self.pods_by_ns.setdefault(pod.namespace, []).append(pod.name)
         self.calls: list[str] = []
 
-    def list_namespaced_custom_object(self, group, version, namespace, plural):
+    def list_namespaced_custom_object(self, group, version, namespace, plural, _request_timeout=None):
         self.calls.append(namespace)
         if namespace in self.failing_namespaces:
             raise _FakeApiException(status=503)

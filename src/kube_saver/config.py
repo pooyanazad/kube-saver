@@ -74,7 +74,7 @@ class SafetyConfig:
             min_memory_bytes=math.ceil(positive(self.min_memory_bytes, 128 * 1024**2)),
             prod_cpu_floor_ratio=ratio(self.prod_cpu_floor_ratio),
             prod_memory_floor_ratio=ratio(self.prod_memory_floor_ratio),
-            aggressive_mode=self.aggressive_mode,
+            aggressive_mode=self.aggressive_mode is True,
         )
 
 
@@ -106,6 +106,21 @@ class PricingOverrides:
     cpu_per_core_hour_usd: float = 0.0
     memory_per_gb_hour_usd: float = 0.0
     label: str = "custom (from config)"
+
+    def normalized(self) -> PricingOverrides:
+        """Accept finite positive overrides; otherwise retain provider rates."""
+        def rate(value: float) -> float:
+            try:
+                number = float(value)
+            except (ValueError, TypeError, OverflowError):
+                return 0.0
+            return number if math.isfinite(number) and number > 0 else 0.0
+
+        return PricingOverrides(
+            cpu_per_core_hour_usd=rate(self.cpu_per_core_hour_usd),
+            memory_per_gb_hour_usd=rate(self.memory_per_gb_hour_usd),
+            label=self.label,
+        )
 
     def as_rate(self) -> PricingRate:
         """Convert to a ``PricingRate`` for the pricing engine."""
@@ -316,10 +331,8 @@ class KubeSaverConfig:
 
     def pricing_has_custom_rates(self) -> bool:
         """Return True if the user supplied non-zero custom pricing."""
-        return (
-            self.pricing.cpu_per_core_hour_usd > 0
-            or self.pricing.memory_per_gb_hour_usd > 0
-        )
+        rates = self.pricing.normalized()
+        return rates.cpu_per_core_hour_usd > 0 or rates.memory_per_gb_hour_usd > 0
 
     def is_pod_excluded(self, pod_name: str, pod_labels: dict[str, str] | None = None, pod_annotations: dict[str, str] | None = None) -> bool:
         """Return True if this pod matches any exclusion policy.

@@ -105,6 +105,7 @@ def load_data(config: KubeSaverConfig) -> TUIData:
     runtime = RuntimeCollector(
         prefer_ebpf=True,
         max_metric_age_seconds=config.runtime.max_metric_age_seconds,
+        timeouts=config.timeouts,
     )
     runtime_result = runtime.collect_all_pods(pods)
     data.metrics_available = runtime_result.metrics_available
@@ -120,9 +121,10 @@ def load_data(config: KubeSaverConfig) -> TUIData:
 
     pricing = PricingEngine(provider=config.cloud_provider, tier=config.provider_tier)
     if config.pricing_has_custom_rates():
+        rates = config.pricing.normalized()
         pricing.set_rate(
-            cpu_per_core_hour=(config.pricing.cpu_per_core_hour_usd if config.pricing.cpu_per_core_hour_usd > 0 else None),
-            memory_per_gb_hour=(config.pricing.memory_per_gb_hour_usd if config.pricing.memory_per_gb_hour_usd > 0 else None),
+            cpu_per_core_hour=(rates.cpu_per_core_hour_usd if rates.cpu_per_core_hour_usd > 0 else None),
+            memory_per_gb_hour=(rates.memory_per_gb_hour_usd if rates.memory_per_gb_hour_usd > 0 else None),
         )
 
     if data.resource_report:

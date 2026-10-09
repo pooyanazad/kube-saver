@@ -18,6 +18,7 @@ from kube_saver.collectors.runtime_models import (
     MemoryBreakdown,
     NetworkIO,
 )
+from kube_saver.config import TimeoutConfig
 from kube_saver.models.core import ActualUsage, MetricSource, PodResourceInfo
 
 
@@ -37,16 +38,17 @@ class RuntimeCollector:
         self,
         prefer_ebpf: bool = True,
         max_metric_age_seconds: float = 300.0,
+        timeouts: TimeoutConfig | None = None,
     ) -> None:
         self.prefer_ebpf = prefer_ebpf
         self.max_metric_age_seconds = max(max_metric_age_seconds, 0.0)
         self.ebpf = EbpfCollector()
-        self.metrics = MetricsCollector()
+        self.metrics = MetricsCollector(timeouts=timeouts)
 
     def _is_metric_fresh(self, observed_at: datetime, now: datetime) -> bool:
         """Return whether a metric is no older than the configured limit."""
         age_seconds = (now - observed_at).total_seconds()
-        return age_seconds <= self.max_metric_age_seconds
+        return 0 <= age_seconds <= self.max_metric_age_seconds
 
     def _mark_unavailable(self, pod: PodResourceInfo) -> ActualUsage:
         """Replace stale pod usage with an estimated unavailable sample."""

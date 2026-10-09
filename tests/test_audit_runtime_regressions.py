@@ -125,3 +125,149 @@ def test_defaults_yaml_includes_both_relative_floor_controls():
     import yaml
 
     assert yaml.safe_load(config_mod.default_config_yaml())["prod_memory_floor_ratio"] == 0.5
+
+
+@pytest.mark.parametrize("value", ["false", "true", 1, None])
+def test_aggressive_mode_requires_an_explicit_boolean(value):
+    cfg = KubeSaverConfig(safety=SafetyConfig(aggressive_mode=value))
+    rec = next(r for r in recommend([pod()], cfg) if r.resource_type == "cpu-request")
+    assert rec.suggested_value == "500m"
+
+
+def test_non_candidate_sibling_also_controls_confidence_and_reason():
+    recs = recommend([pod(), pod("api-b", cpu=610)])
+    rec = next(r for r in recs if r.resource_type == "cpu-request")
+    assert rec.suggested_value == "915m"
+    assert rec.confidence == "low"
+    assert "61%" in rec.reason
+
+
+def test_rolling_request_changes_suppress_only_the_ambiguous_resource():
+    sibling = pod("api-b")
+    sibling.resources.cpu_millicores_request = 800
+    recs = recommend([pod(), sibling])
+    assert not any(r.resource_type == "cpu-request" for r in recs)
+    assert any(r.resource_type == "memory-request" for r in recs)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -1])
+def test_invalid_measured_usage_suppresses_the_workload(value):
+    sibling = pod("api-b", cpu=value)
+    assert recommend([pod(), sibling]) == []
+
+
+@pytest.mark.parametrize("pipeline", ["cli", "tui"])
+@pytest.mark.parametrize("value", [float("inf"), "0.1", "invalid", None])
+def test_invalid_custom_rate_cannot_crash_or_poison_costs(monkeypatch, pipeline, value):
+    overrides = PricingOverrides(cpu_per_core_hour_usd=value)
+    cfg = KubeSaverConfig(cloud_provider=CloudProvider.AWS, pricing=overrides)
+    module = cli_mod if pipeline == "cli" else tui_data
+    class Client(_FakeClient):
+        def get_cluster_info(self):
+            return None
+    monkeypatch.setattr(module, "K8sClient", Client)
+    monkeypatch.setattr(module, "RuntimeCollector", _MeasuredRuntime)
+    monkeypatch.setattr(config_mod, "load_config", lambda: cfg)
+    if pipeline == "tui":
+        class Runtime(_MeasuredRuntime):
+            def collect_all_pods(self, pods):
+                super().collect_all_pods(pods)
+                return SimpleNamespace(metrics_available=True, source=MetricSource.METRICS_SERVER, warnings=[])
+        monkeypatch.setattr(module, "RuntimeCollector", Runtime)
+    report = cli_mod._run_analysis()[1] if pipeline == "cli" else tui_data.load_data(cfg).cost_report
+    assert report is not None
+    expected_cpu = 0.1 if value == "0.1" else 0.042
+    assert report.total_requested_cost.monthly_usd == pytest.approx(730 * (expected_cpu + 0.005))
+
+
+@pytest.mark.parametrize("defect", ["empty", "missing-cpu", "missing-memory", "bad-cpu", "negative", "wrong-container", "bad-timestamp"])
+def test_incomplete_metrics_never_generate_a_plan(monkeypatch, defect):
+    from datetime import datetime, timezone
+
+    from kube_saver.collectors import metrics as metrics_mod
+    from kube_saver.collectors.runtime import RuntimeCollector
+
+    observed = pod()
+    item = {
+        "metadata": {"name": observed.name},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "containers": [{"name": "api", "usage": {"cpu": "10m", "memory": "10Mi"}}],
+    }
+    if defect == "empty":
+        item["containers"] = []
+    elif defect == "bad-timestamp":
+        item["timestamp"] = "unknown"
+    elif defect == "wrong-container":
+        item["containers"][0]["name"] = "other"
+    else:
+        usage = item["containers"][0]["usage"]
+        if defect.startswith("missing"):
+            del usage[defect.removeprefix("missing-")]
+        else:
+            usage["cpu"] = "invalid" if defect == "bad-cpu" else "-1m"
+    api = SimpleNamespace(list_namespaced_custom_object=lambda **_: {"items": [item]})
+    monkeypatch.setattr(metrics_mod, "k8s_client", SimpleNamespace(CustomObjectsApi=lambda: api))
+    runtime = RuntimeCollector(prefer_ebpf=False)
+    runtime.collect_all_pods([observed])
+    assert observed.actual.source is MetricSource.ESTIMATED
+    assert recommend([observed]) == []
+
+
+def test_microcore_metrics_preserve_usage_headroom(monkeypatch):
+    from datetime import datetime, timezone
+
+    from kube_saver.collectors import metrics as metrics_mod
+    observed = pod()
+    api = SimpleNamespace(list_namespaced_custom_object=lambda **_: {"items": [{
+        "metadata": {"name": observed.name},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "containers": [{"name": "api", "usage": {"cpu": "100100u", "memory": "10Mi"}}],
+    }]})
+    monkeypatch.setattr(metrics_mod, "k8s_client", SimpleNamespace(CustomObjectsApi=lambda: api))
+    metrics_mod.MetricsCollector().collect_all_pods([observed])
+    assert observed.actual.cpu_millicores == pytest.approx(100.1)
+    rec = next(r for r in recommend([observed]) if r.resource_type == "cpu-request")
+    assert rec.suggested_value == "151m"
+
+
+def test_future_metric_timestamp_is_not_treated_as_fresh():
+    from datetime import datetime, timedelta, timezone
+
+    from kube_saver.collectors.runtime import RuntimeCollector
+    runtime = RuntimeCollector(prefer_ebpf=False)
+    observed = pod()
+    observed.actual.observed_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=1)
+    runtime.metrics.available = True
+    runtime.metrics.collect_all_pods = lambda _: {"prod/api-a": observed.actual}
+    runtime.collect_all_pods([observed])
+    assert observed.actual.source is MetricSource.ESTIMATED
+
+
+@pytest.mark.parametrize("scoped", [True, False])
+def test_metrics_reads_are_bounded_and_transport_failure_falls_back(monkeypatch, scoped):
+    from urllib3.exceptions import ReadTimeoutError
+
+    from kube_saver.collectors import metrics as metrics_mod
+    from kube_saver.config import TimeoutConfig
+    calls = []
+    def timeout(**kwargs):
+        calls.append(kwargs)
+        raise ReadTimeoutError(None, '/metrics', 'test timeout')
+    api = SimpleNamespace(list_namespaced_custom_object=timeout, list_cluster_custom_object=timeout)
+    monkeypatch.setattr(metrics_mod, "k8s_client", SimpleNamespace(CustomObjectsApi=lambda: api))
+    collector = metrics_mod.MetricsCollector(timeouts=TimeoutConfig(operation_seconds=7))
+    assert collector.collect_pod_metrics([pod()], namespace="prod" if scoped else None) == {}
+    assert calls[0]["_request_timeout"] == 7
+    assert collector.available is False
+
+
+def test_doctor_reports_the_explicit_context_not_kubeconfig_current(monkeypatch, tmp_path):
+    from kube_saver.doctor import run_doctor
+    from tests.test_doctor import _install_fake_kubernetes
+    kubeconfig = tmp_path / "config"
+    kubeconfig.write_text("apiVersion: v1\n")
+    monkeypatch.setenv("KUBECONFIG", str(kubeconfig))
+    _install_fake_kubernetes(monkeypatch, contexts=[{"name": "prod"}, {"name": "staging"}], current_context={"name": "prod"})
+    report = run_doctor(context="staging")
+    assert report.context == "staging"
+    assert "active context is 'staging'" in report.render(use_color=False)
