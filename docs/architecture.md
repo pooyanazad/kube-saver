@@ -1,3 +1,9 @@
+---
+title: Architecture and data flow
+description: Follow Kubernetes requests and metrics-server samples through kube-saver collectors, analyzers, modeled
+  pricing, recommendations, and local exporters.
+---
+
 # Architecture
 
 A short overview of how kube-saver collects data, computes waste, and produces outputs.
@@ -47,7 +53,7 @@ Falling back is **not an error**, it is by design. kube-saver degrades gracefull
 
 | Directory | Purpose |
 |---|---|
-| `src/kube_saver/collectors/` | Kubernetes API, metrics-server, eBPF, runtime source selector |
+| `src/kube_saver/collectors/` | Kubernetes API, metrics-server, eBPF capability detection, runtime source selector |
 | `src/kube_saver/analyzers/` | Waste, cost, health, alerts |
 | `src/kube_saver/pricing/` | Pricing model, currency, exchange rates |
 | `src/kube_saver/recommenders/` | Right-sizing suggestion engine |

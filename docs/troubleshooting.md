@@ -1,3 +1,9 @@
+---
+title: Troubleshooting Kubernetes scans and reports
+description: Diagnose kube-saver authentication, RBAC, missing or stale metrics-server data, empty recommendations,
+  partial reports, and installation errors.
+---
+
 # Troubleshooting
 
 Common issues and how to fix them. If something is missing here, open an issue.

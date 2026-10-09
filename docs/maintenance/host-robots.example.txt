@@ -1,0 +1,5 @@
+# Review and merge with the existing policy in the separate user-site repo.
+# This file is NOT deployed by kube-saver's project-site build.
+User-agent: *
+Allow: /kube-saver/
+Sitemap: https://pooyanazad.github.io/kube-saver/sitemap.xml

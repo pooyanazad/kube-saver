@@ -1,3 +1,9 @@
+---
+title: Release version integrity
+description: Understand kube-saver tag, source, package and CLI version checks, explicit publication guards, and
+  the historical version mismatch.
+---
+
 # Release version integrity
 
 Release tags must match `src/kube_saver/version.py`, wheel/sdist metadata,

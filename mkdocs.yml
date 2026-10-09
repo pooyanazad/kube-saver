@@ -1,0 +1,85 @@
+site_name: kube-saver
+site_description: Kubernetes cost estimates and resource right-sizing with a Python CLI, terminal dashboard, HTML reports, and local change plans.
+site_url: https://pooyanazad.github.io/kube-saver/
+repo_url: https://github.com/pooyanazad/kube-saver
+repo_name: pooyanazad/kube-saver
+edit_uri: blob/main/docs/
+use_directory_urls: true
+strict: true
+theme:
+  name: material
+  language: en
+  font: false
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.action.view
+    - search.highlight
+plugins:
+  - search
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - javascripts/navigation.js
+exclude_docs: |
+  /maintenance/
+  /screenshots/**/*.md
+  /screenshots/**/*.html
+  /screenshots/**/*.sh
+  /screenshots/**/*.txt
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+nav:
+  - Home: README.md
+  - Start:
+      - Installation and first report: getting-started.md
+      - Kubernetes RBAC and authentication: rbac.md
+      - Containers and CI: deployment.md
+  - Understand results:
+      - Pricing, metrics and FAQ: faq.md
+      - Recommendation safety: safety.md
+      - GitOps review workflow: gitops.md
+      - Local outputs and offline viewing: self-contained.md
+      - Comparison: comparison.md
+  - Reference:
+      - CLI reference: cli-reference.md
+      - Configuration: configuration.md
+      - Troubleshooting: troubleshooting.md
+  - Project:
+      - Architecture: architecture.md
+      - Support matrix: support-matrix.md
+      - Dated test evidence: support-evidence.md
+      - Release testing: release-testing.md
+      - Release integrity: release-integrity.md
+      - Contribution guide: https://github.com/pooyanazad/kube-saver/blob/main/CONTRIBUTING.md
+      - GitHub repository: https://github.com/pooyanazad/kube-saver

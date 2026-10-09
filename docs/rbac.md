@@ -1,8 +1,33 @@
+---
+title: Kubernetes RBAC and authentication
+description: Configure kubeconfig or in-cluster authentication and read-only Kubernetes RBAC for cluster-wide or
+  namespace-filtered kube-saver scans.
+---
+
 # RBAC & permissions
 
 The minimum set of Kubernetes API permissions kube-saver needs to operate.
 
 ---
+
+## Authentication and connectivity
+
+A live scan needs a reachable Kubernetes API and an authenticated identity.
+Locally, use your kubeconfig (or set `KUBECONFIG` to its file path). Select a
+context with `KUBE_SAVER_CONTEXT` or `kubeconfig_context`, and check it with
+`kube-saver doctor --context <name>`. Kubeconfig exec plugins may contact an
+identity provider and must be installed where the CLI runs.
+
+Inside a pod, the client loads an available kubeconfig first and otherwise
+uses the mounted service account token. An explicit `KUBECONFIG` must refer to
+an existing file. Authentication does not grant authorization: that identity
+still needs the Kubernetes RBAC below. Cloud IAM alone is insufficient.
+
+Examples using `manifests/` assume you have cloned the
+[repository](https://github.com/pooyanazad/kube-saver) and are in its root.
+`kubectl apply` installs RBAC objects and requires separate administrative
+permissions; kube-saver scans do not create them. The
+[container guide](deployment.md) explains credential mounts and plugins.
 
 ## Minimum required permissions
 

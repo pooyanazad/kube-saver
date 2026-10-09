@@ -1,3 +1,9 @@
+---
+title: Configuration and pricing rates
+description: Configure kube-saver contexts, namespaces, CPU and memory pricing assumptions, currencies, timeouts,
+  exclusions, and recommendation floors.
+---
+
 # Configuration
 
 Configuration is optional. Use it to select namespaces, context, modeled pricing,

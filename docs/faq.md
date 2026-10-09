@@ -1,3 +1,9 @@
+---
+title: Kubernetes cost model and FAQ
+description: How kube-saver models CPU and memory costs, handles missing metrics-server samples, generates local
+  plans, and differs from billing and historical sizing tools.
+---
+
 # Kubernetes cost estimation: kube-saver FAQ
 
 ## What is kube-saver?
@@ -6,6 +12,14 @@ kube-saver is an MIT-licensed Kubernetes resource-cost analyzer with a Python CL
 and terminal dashboard. It reads cluster resource requests and metrics-server
 usage and generates cost estimates, HTML reports, local notifications, and
 resource-change plans.
+
+## Does it require a cloud account or hosted SaaS?
+
+No hosted kube-saver account or cloud billing account is required. It reads
+your Kubernetes API using kubeconfig or in-cluster credentials. A managed
+cluster's authentication plugin may still require a cloud identity and network
+access. You can supply pricing rates locally; kube-saver does not connect to a
+cloud billing API. See [RBAC and authentication](rbac.md).
 
 ## Are the costs actual cloud charges?
 
@@ -85,9 +99,18 @@ access and credential acquisition may require other network access, depending
 on your kubeconfig. There is no required hosted kube-saver account or service.
 Installation also requires packages unless they are already available locally.
 
-## How does it differ from OpenCost or VPA?
+## How does it differ from OpenCost, Goldilocks or VPA?
 
 kube-saver focuses on local snapshots and portable review files. OpenCost provides
 ongoing cost allocation and cloud-cost integrations. Goldilocks uses VPA
 recommendations; VPA has configurable recommendation and update modes. These are
 different data and operational models. See [comparison](comparison.md).
+
+## Verify the implementation
+
+These answers describe the current source checkout. Inspect the
+[pricing engine](https://github.com/pooyanazad/kube-saver/blob/main/src/kube_saver/pricing/engine.py),
+[runtime collector](https://github.com/pooyanazad/kube-saver/blob/main/src/kube_saver/collectors/runtime.py),
+[recommendation engine](https://github.com/pooyanazad/kube-saver/blob/main/src/kube_saver/recommenders/engine.py),
+and [local plan exporter](https://github.com/pooyanazad/kube-saver/blob/main/src/kube_saver/exporters/pr_generator.py).
+Use `kube-saver version` and CLI help to check an installed distribution.

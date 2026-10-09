@@ -1,0 +1,2 @@
+# Optional interaction checks; not needed to build/serve documentation.
+playwright==1.58.0
