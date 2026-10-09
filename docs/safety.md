@@ -17,9 +17,9 @@ This document explains what kube-saver will never do, how it protects your workl
 
 - Auto-apply resource changes to your cluster
 - Modify any Kubernetes object without your explicit action
-- Send data to a third-party service or API
+- Require sending scan data to a hosted kube-saver service
 - Require a cloud account, token, or hosted backend
-- Crash because metrics-server is unavailable
+- Require metrics-server for request-based reports
 - Generate a right-sizing recommendation from request-only estimates
 
 ---
@@ -44,6 +44,12 @@ the largest suggestion across all collected sibling samples, including busy
 replicas that would not generate their own candidate. A missing sample,
 multi-container sibling, or excluded sibling suppresses the workload plan.
 Values round upward to whole millicores and MiB to preserve sample headroom.
+Malformed, incomplete, negative, non-finite, missing-timestamp, stale, or
+future-dated samples are treated as unavailable. Measured container names must
+match collected pod containers. If sibling requests differ for a resource,
+that resource's recommendation is suppressed because the active controller
+template cannot be inferred safely during a rollout. Confidence and rationale
+use the least wasteful collected sibling, including non-candidates.
 
 CPU × 1.5 and memory × 1.2 are fixed sample multipliers. Configured absolute
 minimums apply in every mode. In normal mode, `prod_cpu_floor_ratio` and
@@ -54,7 +60,10 @@ Configure exclusions for sensitive workloads. Even a complete scan is a current
 snapshot, not proof that future replicas or future peaks are covered.
 
 `pr-plan` creates local files, not a GitHub PR. Executing the patch script contacts
-the Kubernetes API and can trigger a workload rollout. For GitOps, translate
+the Kubernetes API and can trigger a workload rollout. The script requires
+`KUBE_SAVER_APPLY_CONTEXT` to name an explicitly reviewed kubectl context,
+passes it to every patch, and stops on the first failed command. Verify this
+context identifies the cluster you scanned. For GitOps, translate
 reviewed changes into your managed manifests.
 
 If you want to suppress recommendations for specific workloads, use the exclusion config:
@@ -143,14 +152,16 @@ collection is not implemented in this release.
 
 ## Secrets and sensitive data
 
-kube-saver never logs or exports:
+kube-saver does not intentionally collect or export:
 
 - Kubeconfig contents
 - Tokens or credentials
 - Pod environment variables
 - Secret objects or their data
 
-The `doctor` command reports the kubeconfig path, active context, and server version, but does not print credentials. Reports and plans contain namespace, pod, and workload names; review them before sharing or committing them.
+The `doctor` command reports the kubeconfig path, selected context, and server
+version. API and credential-plugin error text can appear in diagnostics; inspect
+and redact logs before sharing them. Reports and plans contain namespace, pod, and workload names; review them before sharing or committing them.
 
 ---
 

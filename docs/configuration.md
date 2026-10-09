@@ -32,7 +32,8 @@ The example below matches the unknown-provider fallback. Provider-specific
 assumptions differ. Monthly estimates use 730 hours; see the [FAQ](faq.md).
 
 Custom CPU and memory rates can be supplied independently. A positive custom
-rate replaces that dimension; a zero or omitted rate retains the provider default.
+rate replaces that dimension; zero, omitted, negative, non-numeric, and non-finite
+rates retain the provider default. Numeric strings are accepted.
 
 ```yaml
 pricing:
@@ -104,7 +105,7 @@ namespace_filter:
 
 ## Alerts
 
-Thresholds used by `kube-saver notify` and the TUI alert panel:
+Thresholds used by the TUI alert panel:
 
 ```yaml
 alerts:
@@ -114,7 +115,8 @@ alerts:
   critical_monthly_usd: 500
 ```
 
-`notify --threshold` is a command option (default: 100 USD), not a config key.
+`notify --threshold` is a command option (default: 100 USD); it does not use
+these TUI alert thresholds.
 
 ---
 
@@ -131,7 +133,9 @@ aggressive_mode: false
 ```
 
 The relative floors apply to every eligible workload in normal mode. Aggressive
-mode skips relative floors, not absolute minimums. CPU × 1.5 and memory × 1.2
+mode skips relative floors, not absolute minimums. Only a YAML boolean `true`
+(or a supported truthy environment value) enables it; quoted strings such as
+`"false"` and other non-boolean YAML values retain normal-mode protection. CPU × 1.5 and memory × 1.2
 remain fixed current-sample buffers. Invalid absolute floors use defaults;
 relative floors use defaults if non-positive and cap at 1.0.
 
@@ -173,13 +177,16 @@ These are CLI options, not config keys. The server defaults to loopback. See [Sa
 
 ## Kubernetes API timeouts
 
-kube-saver applies bounded timeouts to every Kubernetes API call so a slow or unreachable control plane cannot block a scan indefinitely. Three knobs are available; all are optional and have safe defaults.
+kube-saver supplies HTTP timeouts to collector and doctor API reads. These
+bound connection/read waits; they are not a wall-clock deadline for an entire
+scan, credential plugin, or retry sequence. Three knobs are available; all
+are optional and have defaults.
 
 ```yaml
 timeouts:
   connect_seconds: 10       # TCP connect deadline per request
   read_seconds: 30          # read deadline per request
-  operation_seconds: 60     # per-call list/get deadline
+  operation_seconds: 60     # HTTP timeout passed to list/get calls
 ```
 
 ### Safe defaults and rationale
@@ -188,7 +195,7 @@ timeouts:
 |---|---|---|
 | `connect_seconds` | `10` | Long enough for a cold TLS handshake to a managed control plane (EKS/GKE/AKS) over a typical corporate link, short enough to fail fast on a dead endpoint. |
 | `read_seconds` | `30` | Covers large namespace listings on busy clusters while still bounding hung responses. |
-| `operation_seconds` | `60` | Upper bound for a single list/get call. Large clusters with thousands of pods normally return well under this. |
+| `operation_seconds` | `60` | HTTP timeout passed to list/get requests, including Metrics API reads. This is not an overall scan deadline. |
 
 Invalid values (zero, negative, non-numeric, `NaN`, `inf`) are silently replaced with the defaults — kube-saver never runs with timeouts disabled.
 
@@ -207,6 +214,7 @@ Environment variables override config-file values; CLI flags are not provided be
 Timeouts are applied consistently across:
 
 - `K8sClient` collectors (cluster info, namespaces, pods, node→pod maps)
+- metrics-server collection (per-call operation timeout)
 - `kube-saver doctor` (version check and RBAC self-subject access reviews)
 - the HTTP API server and TUI, which both use the same `K8sClient` path
 

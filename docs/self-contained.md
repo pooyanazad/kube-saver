@@ -37,7 +37,9 @@ All files are written to a local directory you specify:
 | `apply-patches.sh` | Bash script | Ready-to-run commands to apply the recommended resource changes |
 | `README.md` | Markdown | Context and instructions for the reviewer |
 
-The `apply-patches.sh` script is **not auto-executed**. It is a file you review, test, and run yourself. kube-saver will never mutate your cluster without your explicit action.
+The `apply-patches.sh` script is **not auto-executed**. Set
+`KUBE_SAVER_APPLY_CONTEXT` to an explicitly reviewed target before running it;
+the script stops on the first failed command. It is a file you review, test, and run yourself. kube-saver will never mutate your cluster without your explicit action.
 
 ### Notifications (`kube-saver notify`)
 

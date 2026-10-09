@@ -21,7 +21,9 @@ docker run --rm \
   report -o /out/report.html
 
 docker run --rm \
-  -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
+  --user "$(id -u):$(id -g)" \
+  -e KUBECONFIG=/tmp/kubeconfig \
+  -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
   pooyanazad/kube-saver:latest \
   doctor
 ```
@@ -29,7 +31,8 @@ docker run --rm \
 The first command preserves `reports/report.html` on the host after `--rm`
 removes the container. On Linux/macOS, `--user` matches the host directory owner;
 `KUBECONFIG` is explicit because the user override can change home discovery.
-The doctor example uses the image user's conventional kubeconfig path.
+The doctor example uses the same UID and explicit path so it can read a
+host kubeconfig with owner-only permissions.
 
 Kubeconfigs that reference certificate files need those files mounted too.
 Exec credential plugins such as `aws`, `gcloud`, or `kubelogin` must be available
@@ -37,7 +40,8 @@ inside the container; the base image does not install them. Use a suitable image
 or run natively. Local cluster endpoints on `127.0.0.1` also need a network path
 from the container (the CI smoke test uses host networking on Linux).
 
-> Always mount `:ro` (read-only). kube-saver never modifies your kubeconfig.
+> Mount kubeconfig with `:ro` (read-only). Credential plugins may need access to
+> other files or writable caches; inspect their requirements separately.
 
 ### Mounting multiple kubeconfig files
 
@@ -45,9 +49,10 @@ If you use a merged kubeconfig or split contexts across files:
 
 ```bash
 docker run --rm \
-  -v "$HOME/.kube/config:/home/kube-saver/.kube/config:ro" \
-  -v "$HOME/.kube/extra-config:/home/kube-saver/.kube/extra-config:ro" \
-  -e KUBECONFIG=/home/kube-saver/.kube/config:/home/kube-saver/.kube/extra-config \
+  --user "$(id -u):$(id -g)" \
+  -v "$HOME/.kube/config:/tmp/kubeconfig:ro" \
+  -v "$HOME/.kube/extra-config:/tmp/extra-kubeconfig:ro" \
+  -e KUBECONFIG=/tmp/kubeconfig:/tmp/extra-kubeconfig \
   pooyanazad/kube-saver:latest \
   doctor
 ```

@@ -38,7 +38,8 @@ current analyzer, so displayed waste may equal all requested capacity. A 0%
 efficiency label in this mode does not prove that a workload is idle.
 
 Even when some metrics are available, check coverage: a missing or stale sample
-for an individual pod is treated as estimated. The default maximum sample age
+for an individual pod is treated as estimated. Invalid, incomplete, or
+future-dated samples are also unavailable. The default maximum sample age
 is 300 seconds. `doctor` probes Metrics API availability, but does not verify
 coverage or freshness for every pod. Partial pod scans warn on stderr, include
 a notice in HTML, and set `degraded` in report JSON. A fully failed pod scan
@@ -56,7 +57,8 @@ Scanning and generating files do not change workloads. `kube-saver pr-plan`
 writes local review files and a shell script with `kubectl patch` commands.
 Running that script yourself changes the cluster. It does not update your GitOps
 source of truth or create a GitHub PR. Translate reviewed changes into your
-managed manifests when using GitOps.
+managed manifests when using GitOps. Generated scripts require an explicit
+`KUBE_SAVER_APPLY_CONTEXT` and stop on the first failed patch.
 
 ## How reliable are recommendations?
 
@@ -68,7 +70,13 @@ and relative floors are configurable; aggressive mode skips relative floors.
 Workload consolidation considers all collected sibling samples, including busy
 replicas without independent candidates. This does not protect against future
 peaks or prove coverage of replicas outside the snapshot. Confidence labels are utilization-ratio heuristics,
-not statistical confidence intervals. See [safety](safety.md).
+not statistical confidence intervals. They use the least wasteful observed
+sibling. Different sibling requests suppress recommendations for the affected
+resource, as the current controller template is ambiguous. See [safety](safety.md).
+
+The Python helper `generate_recommendations(..., config=None)` retains its
+legacy 50m CPU / 64Mi memory minimums without relative floors. Pass an explicit
+`KubeSaverConfig` to use the configured CLI/TUI guardrails.
 
 ## Can it run offline?
 
