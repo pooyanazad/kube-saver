@@ -271,3 +271,27 @@ def test_doctor_reports_the_explicit_context_not_kubeconfig_current(monkeypatch,
     report = run_doctor(context="staging")
     assert report.context == "staging"
     assert "active context is 'staging'" in report.render(use_color=False)
+
+
+def test_apply_script_requires_explicit_context_and_quotes_it(tmp_path):
+    import os
+    import subprocess
+
+    from kube_saver.exporters.pr_generator import generate_pr_plan
+    script = tmp_path / "apply.sh"
+    script.write_text(generate_pr_plan(recommend([pod()])).files["apply-patches.sh"])
+    env = dict(os.environ)
+    env.pop("KUBE_SAVER_APPLY_CONTEXT", None)
+    assert subprocess.run(["bash", str(script)], env=env, capture_output=True).returncode != 0
+    kubectl = tmp_path / "kubectl"
+    kubectl.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$@" >> "$TEST_ARGS"\n')
+    kubectl.chmod(0o755)
+    env.update(PATH=str(tmp_path) + os.pathsep + env["PATH"], TEST_ARGS=str(tmp_path / "args"), KUBE_SAVER_APPLY_CONTEXT="reviewed; $(touch unwanted)")
+    assert subprocess.run(["bash", str(script)], cwd=tmp_path, env=env, capture_output=True).returncode == 0
+    args = (tmp_path / "args").read_text().splitlines()
+    assert args[:2] == ["--context", "reviewed; $(touch unwanted)"]
+    assert not (tmp_path / "unwanted").exists()
+    kubectl.write_text('#!/usr/bin/env bash\necho called >> "$TEST_ARGS"\nexit 9\n')
+    (tmp_path / "args").write_text("")
+    assert subprocess.run(["bash", str(script)], env=env, capture_output=True).returncode == 9
+    assert (tmp_path / "args").read_text().splitlines() == ["called"]
