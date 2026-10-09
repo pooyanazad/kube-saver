@@ -13,7 +13,7 @@ Before opening an issue or PR, check the docs:
 - **[Configuration](docs/configuration.md)**, config keys and environment variables
 - **[Architecture](docs/architecture.md)**, module map and data flow
 - **[Troubleshooting](docs/troubleshooting.md)**, common issues and fixes
-- **[Comparison](docs/comparison.md)**, vs k9s, Goldilocks, VPA, Kubecost
+- **[Comparison](docs/comparison.md)**, workflows for k9s, Goldilocks, VPA, OpenCost
 - **[Safety & trust](docs/safety.md)**, RBAC, recommendation boundaries, trust model
 
 ## Principles
@@ -77,14 +77,18 @@ Before starting work, contributors should check whether an open issue exists for
 
 For bug fixes that involve more than 50 lines of code and tests combined, contributors must create an issue first if no relevant issue already exists, and reference that issue in the pull request.
 
-Only the following contribution types are expected to be approved:
+Documentation corrections, tests, reproducible bug fixes, and focused usability
+improvements are welcome. Discuss substantial features in an issue before
+implementing them. An issue is not required for a small documentation correction.
 
-- changes that address an existing open issue
-- critical bug fixes that protect correctness, reliability, or release quality
+External contributors should fork the repository, create a topic branch in the
+fork, and open a pull request targeting `main`. Maintainers can use topic branches
+in this repository. Nobody needs write access to a shared `dev` branch to
+contribute. Do not push directly to `main`.
 
-Pull requests outside those categories may be closed without merge.
-
-All contributors must make changes and push commits only to the `dev` branch. Direct pushes to the `main` branch are not allowed. Changes intended for `main` must be submitted through a pull request from `dev`.
+For a first contribution, reproduce an installation issue, correct an outdated
+example, or add a regression test for a confirmed bug. Include the command,
+expected result, and validation so reviewers can assess the change.
 
 Please keep pull requests:
 

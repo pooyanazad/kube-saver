@@ -55,20 +55,22 @@ Falling back is **not an error**, it is by design. kube-saver degrades gracefull
 | `src/kube_saver/exporters/` | HTML, JSON, YAML, Helm, Prometheus, Markdown, PR plan, notifications |
 | `src/kube_saver/server.py` | Read-only HTTP API (loopback default) |
 | `src/kube_saver/config.py` | Config loading, validation, default generation |
-| `src/kube_saver/cli.py` | Typer CLI entry point |
+| `src/kube_saver/cli.py` | Click CLI entry point |
 
 ---
 
 ## Output guarantees
 
-All outputs are designed to be self-contained and dependency-free:
+Generated report data is portable. Live collection and executing patch scripts
+still require cluster access. Some exporter formats are Python helpers, not CLI
+commands; see the [CLI reference](cli-reference.md).
 
 | Output | External dependencies |
 |---|---|
 | HTML report | None, inline CSS, no CDN, no JS |
 | JSON / YAML / Helm values | None, standard formats |
 | Prometheus metrics | None, standard exposition format |
-| PR plan files | None, plain Markdown and Bash |
+| PR plan files | Reading: standard text tools; applying: Bash, kubectl, cluster access |
 | Notifications | None, plain Markdown |
 | HTTP API | Loopback only by default; no external auth |
 

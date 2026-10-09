@@ -87,7 +87,8 @@ BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 ## "Insufficient permissions" or exit code 4
 
-**Cause:** Your kubeconfig identity does not have the required RBAC permissions.
+**Cause:** Required RBAC may be missing, or every pod read failed for another
+reason. Exit code 4 represents an analysis failure; inspect stderr and `doctor`.
 
 **What to do:**
 
@@ -99,22 +100,23 @@ BCC or running kube-saver as root will not enable eBPF metrics yet.
 
 ## Recommended values look too high or too low
 
-**Cause:** The recommendation engine uses a configurable headroom buffer (default: 20%) and a minimum resource floor.
+**Cause:** The engine uses current-sample CPU × 1.5 and memory × 1.2, minimum
+configured absolute and relative floors, and upward output rounding. CLI default
+floors are 100m, 128Mi, and half of current requests. It does not model historical peaks.
 
 **What to do:**
 
-- Check which runtime source is active; estimates are less accurate than metrics-server.
-- If a workload is intentionally bursty, annotate it with `kube-saver.io/ignore: "true"` to exclude it from recommendations.
+- Check sample coverage; estimated samples do not generate right-sizing recommendations.
+- For bursty workloads, configure `exclude_annotations` with `kube-saver.io/ignore: "true"` and add that annotation to the pods. The annotation alone is not an automatic exclusion.
 - Review the current request and observed usage in the report before applying a plan. The recommendation engine currently uses fixed headroom factors.
 
 ---
 
 ## Report shows 0% efficiency for all namespaces
 
-**Cause:** This means kube-saver detected zero runtime usage for every pod. This happens when:
-
-- metrics-server is not running, AND
-- the cluster has no pods making requests above the minimum floor
+**Cause:** Missing or stale samples are represented as estimated zero usage.
+A 0% efficiency label can therefore mean missing telemetry, rather than idle
+workloads. No minimum-request condition is needed for this fallback.
 
 **What to do:**
 

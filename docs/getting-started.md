@@ -2,14 +2,17 @@
 
 This guide walks you from a fresh install to your first kube-saver output on the four most common cluster types.
 
-> **Time to first result:** under 5 minutes if you have `kubectl` access to any cluster.
+Requires Python 3.10+ and a reachable Kubernetes cluster with read permissions.
+Setup time depends on cluster access, credentials, and metrics availability.
 
 ---
 
 ## 1. Install
 
 ```bash
-pip install kube-saver
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install kube-saver
 ```
 
 From source (recommended for development):
@@ -36,19 +39,20 @@ Before running a full scan, verify kube-saver can reach your cluster and has the
 kube-saver doctor
 ```
 
-A successful run prints something like:
+`doctor` checks kubeconfig, context, cluster reachability, required RBAC, and
+Metrics API availability. Missing metrics are optional warnings: request-based
+estimates can still run. A passing check does not guarantee fresh samples for
+every pod. See [CLI reference](cli-reference.md#kube-saver-doctor) and
+[Troubleshooting](troubleshooting.md).
 
-```text
-[ok] kubeconfig context: kind-demo
-[ok] cluster reachable
-[ok] read pods (5/5 namespaces)
-[ok] read nodes
-[ok] metrics-server available (using as primary runtime source)
-[ok] HTML report renderer
-[ok] PR plan exporter
+If scans use a configured context, pass that same name to `doctor --context`:
+
+```bash
+KUBE_SAVER_CONTEXT=staging-cluster kube-saver doctor --context staging-cluster
 ```
 
-Any `[fail]` line tells you exactly what to fix. See [Troubleshooting](troubleshooting.md) for the common cases.
+`doctor --context` overrides the configured context. Without that option, doctor
+uses `KUBE_SAVER_CONTEXT` or `kubeconfig_context`, then the kubeconfig current context.
 
 ---
 
@@ -73,7 +77,9 @@ aws eks update-kubeconfig --name my-cluster --region us-east-1
 kube-saver
 ```
 
-If you run inside an EKS node with IAM roles for service accounts, kube-saver will pick up the in-cluster config automatically when launched from inside a pod.
+When launched inside a pod, kube-saver can use the mounted Kubernetes service
+account token. The service account needs Kubernetes RBAC read permissions; an
+AWS IAM role alone does not grant those permissions.
 
 ### Generic kubeconfig
 
@@ -100,7 +106,8 @@ The fastest path to a real, shareable artifact:
 
 ```bash
 # Self-contained HTML report (open it in any browser)
-kube-saver report -o cost-report.html && open cost-report.html
+kube-saver report -o cost-report.html
+# Open cost-report.html in your browser
 ```
 
 The HTML file has no external assets, no CDN, and no JavaScript dependencies, it works offline, in an email attachment, and in a CI artifact.
@@ -138,7 +145,7 @@ ls ./pr-files
 Add kube-saver to a cron job or CI pipeline:
 
 ```bash
-# Daily markdown summary + spike alert written to ./alerts
+# Daily Markdown summary; optional spike alert with complete measured coverage
 kube-saver notify -d ./alerts --threshold 250
 ```
 
@@ -165,6 +172,7 @@ For a CI artifact with self-contained HTML:
 
 ## Next steps
 
+- [Cost model and FAQ](faq.md), interpret estimates and recommendation limits
 - [CLI reference](cli-reference.md), every command and flag
 - [Configuration](configuration.md), change currency, pricing, alerts
 - [Architecture](architecture.md), how the pieces fit together

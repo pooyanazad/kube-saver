@@ -1,6 +1,7 @@
 # CLI reference
 
-Every command, flag, and code helper kube-saver exposes. If something is missing here, it does not exist.
+Commands, supported flags, and selected Python helpers from the source checkout.
+Use your installed command's `--help` to check released-package behavior.
 
 ## Commands
 
@@ -63,6 +64,10 @@ Files produced:
 | `apply-patches.sh` | Bash script with the recommended resource changes (does **not** auto-apply, review first) |
 | `README.md` | Context and instructions for the reviewer |
 
+Before applying a reviewed plan, verify that a named kubectl context identifies
+the scanned cluster, then set `KUBE_SAVER_APPLY_CONTEXT` to that name.
+The script requires it and stops on the first failed patch.
+
 ### `kube-saver notify`
 
 Write daily summary and spike alert Markdown files to disk.
@@ -104,7 +109,7 @@ kube-saver version
 
 ### `kube-saver doctor`
 
-Check kubeconfig, connectivity, RBAC, and Metrics API availability. Use `--context NAME` to check a specific context. If `namespace_filter` is configured, RBAC and metrics checks target those namespaces. Missing metrics permissions or an unavailable metrics-server are reported as optional because request-based estimates still work.
+Check kubeconfig, connectivity, RBAC, and Metrics API availability. Use `--context NAME` to override the configured scan context. If `namespace_filter` is configured, RBAC and metrics checks target those namespaces. Missing metrics permissions or an unavailable metrics-server are reported as optional because request-based estimates still work. This checks API availability, not fresh sample coverage for every pod.
 
 ---
 
@@ -163,7 +168,7 @@ The CLI has no global options. Set these environment variables before a command,
 
 | Setting | Description |
 |---|---|
-| `KUBE_SAVER_CONTEXT` | kubeconfig context for scans and the TUI |
+| `KUBE_SAVER_CONTEXT` | kubeconfig context for scans, doctor, and the TUI |
 | `KUBECONFIG` | kubeconfig file path |
 | `~/.kube-saver/config.yaml` | User config file |
 | `.kube-saver.yaml` | Project config file |

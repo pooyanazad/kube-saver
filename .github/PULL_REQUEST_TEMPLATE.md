@@ -32,7 +32,7 @@ Example:
 ## Checklist
 
 ### Before merge
-- [ ] `pytest -q` passes (158 tests)
+- [ ] `pytest -q` passes (record the count and Python version below)
 - [ ] `ruff check src tests` passes
 - [ ] `mypy src` passes
 - [ ] Manual smoke test completed (describe below)
