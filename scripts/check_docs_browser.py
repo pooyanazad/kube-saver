@@ -36,7 +36,8 @@ def check(site: Path, output: Path) -> None:
                 expect(page.locator(".md-search-result__meta")).to_have_text(
                     "Type to start searching", timeout=30000,
                 )
-                page.get_by_role("textbox", name="Search", exact=True).fill("metrics-server")
+                # Material updates search queries on keyup; fill() emits no key events.
+                page.get_by_role("textbox", name="Search", exact=True).press_sequentially("metrics-server")
                 page.locator(".md-search-result__item").first.wait_for(state="visible")
                 assert page.locator(".md-search-result__item").count() > 0
                 page.keyboard.press("Escape")
