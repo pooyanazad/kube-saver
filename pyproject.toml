@@ -69,7 +69,7 @@ kube-saver = "kube_saver.cli:main"
 [project.urls]
 Homepage = "https://github.com/pooyanazad/kube-saver"
 Repository = "https://github.com/pooyanazad/kube-saver"
-Documentation = "https://github.com/pooyanazad/kube-saver/blob/main/docs/README.md"
+Documentation = "https://pooyanazad.github.io/kube-saver/"
 Issues = "https://github.com/pooyanazad/kube-saver/issues"
 
 [tool.hatch.build.targets.wheel]
