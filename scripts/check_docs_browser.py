@@ -55,6 +55,9 @@ def check(site: Path, output: Path) -> None:
                 expect(page.get_by_role("button", name="Close navigation", exact=True)).to_have_attribute(
                     "aria-expanded", "true",
                 )
+                # The active Start section initially occupies the mobile drawer.
+                # Use its back control to reach the top-level section list.
+                page.locator("label.md-nav__title").filter(has_text="Start").click()
                 page.locator("label.md-nav__link").filter(has_text="Understand results").click()
                 page.get_by_role("navigation", name="Navigation", exact=True).get_by_role(
                     "link", name="GitOps review workflow", exact=True,
