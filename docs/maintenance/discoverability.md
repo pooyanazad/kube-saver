@@ -181,20 +181,21 @@ and release workflow remain unchanged in this documentation proposal.
 - Local Python 3.12 suite: 387 tests passed. Ruff, mypy (40 files including the
   new site validator), actionlint, and whitespace checks passed.
 - MkDocs 1.6.1 / Material 9.7.7 strict production build passed. Validator
-  checked 17 canonical pages, unique titles/descriptions, 1,314 internal
+  checked 17 canonical pages, unique titles/descriptions, 1,331 internal
   links/assets/anchors, XML/gzip sitemap, viewport metadata, local assets and
   populated search index. Broken canonical, broken link, mismatched sitemap,
   and accidental noindex fixtures were correctly rejected.
 - Existing source-example checks passed: 20 Markdown files, 116 local
   links/assets/anchors, 19 YAML blocks, 2 Python blocks, 48 shell blocks,
   8 CLI help checks, report/doctor flags, and FAQ arithmetic.
-- Visual desktop/mobile interaction tests remain **unverified**: the cloud
+- Local visual desktop/mobile interaction tests could not run: the cloud
   browser blocked localhost, the standard browser download was unusable, and
   an isolated packaged Chromium renderer could not launch in this execution
-  environment. No UI test pass is claimed. Preview locally using the commands
-  above or download the PR's `documentation-preview` CI artifact and serve it
-  under `/kube-saver/`. Check keyboard access, mobile drawer, code scrolling,
-  and a live search before approving publication.
+  environment. No local UI test pass is claimed. The Documentation workflow
+  now performs browser checks on GitHub's runner; confirm its final results
+  and inspect `documentation-browser-evidence`. Preview locally using the
+  commands above or download the PR's `documentation-preview` CI artifact
+  and serve it under `/kube-saver/` before approving publication.
 - Repository API still reports the old About description, null homepage,
   empty Topics, and Pages disabled. The GitHub plugin exposes no settings
   write action; browser passkey authentication did not complete. The exact

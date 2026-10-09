@@ -47,7 +47,8 @@ def check(site: Path, output: Path) -> None:
                 page.set_viewport_size({"width": 390, "height": 844})
                 page.goto(f"{base}getting-started/", wait_until="networkidle")
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-                page.locator('label[for="__drawer"]').first.click()
+                page.get_by_role("button", name="Open navigation", exact=True).press("Enter")
+                assert page.get_by_role("button", name="Close navigation", exact=True).get_attribute("aria-expanded") == "true"
                 page.get_by_role("navigation", name="Navigation", exact=True).get_by_role(
                     "link", name="GitOps review workflow", exact=True,
                 ).click()
