@@ -1,0 +1,138 @@
+name: Publish verified package to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing public GitHub release with verified wheel, source and checksums
+        required: true
+        default: v2.0.0
+        type: string
+      expected_commit:
+        description: Reviewed full source commit for the release tag
+        required: true
+        default: aabcf088c0f1500728380beb9c060b59908d83e5
+        type: string
+      checksum_sha256:
+        description: Reviewed SHA256 of the release SHA256SUMS.txt file
+        required: true
+        default: dfaefb920456d7cf87c6a37d40ccf8bc19522c7b11fdb5d4a585cc3ea3a98206
+        type: string
+      publish_pypi:
+        description: Publish validated assets using the owner-configured PyPI Trusted Publisher
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kube-saver-pypi-publication
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Check dispatch inputs, source commit, and public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_COMMIT: ${{ inputs.expected_commit }}
+          CHECKSUM_SHA256: ${{ inputs.checksum_sha256 }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          current_main=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          [[ "$current_main" == "$GITHUB_SHA" ]]
+          python -m scripts.verify_pypi_release --tag "$RELEASE_TAG" --expected-commit "$RELEASE_COMMIT" --checksum-sha256 "$CHECKSUM_SHA256"
+          bash scripts/verify_release_tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_COMMIT&per_page=100" > release-ci.json
+          python -m scripts.verify_pypi_release --tag "$RELEASE_TAG" --expected-commit "$RELEASE_COMMIT" --checksum-sha256 "$CHECKSUM_SHA256" --ci-run-json release-ci.json
+          git show "$RELEASE_COMMIT:src/kube_saver/version.py" > release-source-version.py
+          gh release view "$RELEASE_TAG" --json tagName,isDraft > selected-release.json
+          python - <<'PY'
+          import json, os
+          release = json.load(open("selected-release.json"))
+          assert release["tagName"] == os.environ["RELEASE_TAG"] and not release["isDraft"]
+          PY
+          version="${RELEASE_TAG#v}"
+          mkdir -p release-dist
+          gh release download "$RELEASE_TAG" --dir release-dist --pattern "kube_saver-$version-py3-none-any.whl" --pattern "kube_saver-$version.tar.gz" --pattern SHA256SUMS.txt
+          python -m scripts.verify_pypi_release --tag "$RELEASE_TAG" --expected-commit "$RELEASE_COMMIT" --checksum-sha256 "$CHECKSUM_SHA256" --source release-source-version.py --dist-dir release-dist
+      - name: Check distributions and the installed release CLI
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          python -m pip install "twine>=7,<8"
+          python -m twine check release-dist/*.whl release-dist/*.tar.gz
+          python -m venv /tmp/pypi-wheel-test
+          /tmp/pypi-wheel-test/bin/python -m pip install release-dist/*.whl
+          /tmp/pypi-wheel-test/bin/python scripts/verify_release.py --source release-source-version.py --dist-dir release-dist --require-checksums --tag "$RELEASE_TAG"
+          /tmp/pypi-wheel-test/bin/kube-saver report --help
+          /tmp/pypi-wheel-test/bin/kube-saver doctor --help
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-pypi-release
+          path: |
+            release-dist/*
+            release-source-version.py
+          retention-days: 1
+
+  publish:
+    if: inputs.publish_pypi && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/kube-saver/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-pypi-release
+          path: verified-release
+      - name: Recheck the release and prevent duplicate publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_COMMIT: ${{ inputs.expected_commit }}
+          CHECKSUM_SHA256: ${{ inputs.checksum_sha256 }}
+        run: |
+          current_main=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          [[ "$current_main" == "$GITHUB_SHA" ]]
+          bash scripts/verify_release_tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_COMMIT&per_page=100" > release-ci.json
+          python -m scripts.verify_pypi_release --tag "$RELEASE_TAG" --expected-commit "$RELEASE_COMMIT" --checksum-sha256 "$CHECKSUM_SHA256" --ci-run-json release-ci.json
+          python -m scripts.verify_pypi_release --tag "$RELEASE_TAG" --expected-commit "$RELEASE_COMMIT" --checksum-sha256 "$CHECKSUM_SHA256" --source verified-release/release-source-version.py --dist-dir verified-release/release-dist
+          python - <<'PY'
+          import os, urllib.error, urllib.request
+          version = os.environ["RELEASE_TAG"][1:]
+          try:
+              with urllib.request.urlopen(f"https://pypi.org/pypi/kube-saver/{version}/json", timeout=30):
+                  raise SystemExit("This PyPI version already exists; refusing duplicate upload.")
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+          PY
+          mkdir pypi-dist
+          cp verified-release/release-dist/*.whl verified-release/release-dist/*.tar.gz pypi-dist/
+      - name: Publish exact verified assets through PyPI OIDC
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1, verified 2026-10-09
+        with:
+          packages-dir: pypi-dist/
+          skip-existing: false
