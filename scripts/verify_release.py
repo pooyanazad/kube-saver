@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import re
 import subprocess
 import sys
@@ -20,12 +21,31 @@ def source_version(text: str) -> str:
             for target in node.targets
         ):
             value = ast.literal_eval(node.value)
-            if isinstance(value, str) and re.fullmatch(r"[0-9][A-Za-z0-9.!+_-]*", value):
+            if isinstance(value, str) and re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:(?:a|b|rc)[0-9]+|\.post[0-9]+)?", value):
                 return value
-    raise ValueError("VERSION must be a literal version string")
+    raise ValueError("VERSION must be a canonical major.minor.patch version (optional a/b/rc/post suffix)")
 
 
-def verify_release(source: Path, dist: Path, cli_output: str, tag: str | None = None) -> str:
+def verify_checksums(dist: Path, artifacts: list[Path], required: bool = False) -> None:
+    manifest = dist / "SHA256SUMS.txt"
+    if not manifest.exists():
+        if required:
+            raise ValueError("missing SHA256SUMS.txt")
+        return
+    entries: dict[str, str] = {}
+    for line in manifest.read_text().splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  (?:dist/)?([^/\\]+)", line)
+        if match is None or match[2] in entries:
+            raise ValueError("invalid or duplicate checksum entry")
+        entries[match[2]] = match[1]
+    if set(entries) != {artifact.name for artifact in artifacts}:
+        raise ValueError("checksum manifest must cover exactly the wheel and sdist")
+    for artifact in artifacts:
+        if hashlib.sha256(artifact.read_bytes()).hexdigest() != entries[artifact.name]:
+            raise ValueError(f"checksum mismatch: {artifact.name}")
+
+
+def verify_release(source: Path, dist: Path, cli_output: str, tag: str | None = None, *, require_checksums: bool = False) -> str:
     """Require exactly one wheel/sdist and agreeing source, metadata and CLI."""
     version = source_version(source.read_text())
     if tag is not None and tag != f"v{version}":
@@ -35,6 +55,9 @@ def verify_release(source: Path, dist: Path, cli_output: str, tag: str | None = 
     sdists = list(dist.glob("*.tar.gz"))
     if len(wheels) != 1 or len(sdists) != 1:
         raise ValueError("expected exactly one wheel and one sdist")
+    verify_checksums(dist, wheels + sdists, require_checksums)
+    if {p.name for p in dist.iterdir()} - {wheels[0].name, sdists[0].name, "SHA256SUMS.txt"}:
+        raise ValueError("unexpected distribution files")
     with zipfile.ZipFile(wheels[0]) as wheel:
         paths = [p for p in wheel.namelist() if p.endswith(".dist-info/METADATA")]
         if len(paths) != 1:
@@ -62,6 +85,10 @@ def verify_release(source: Path, dist: Path, cli_output: str, tag: str | None = 
     mismatches = {name: value for name, value in versions.items() if value != version}
     if mismatches:
         raise ValueError(f"artifact version mismatch: {mismatches}")
+    if not re.fullmatch(rf"kube_saver-{re.escape(version)}-[^-]+-[^-]+-[^-]+\.whl", wheels[0].name):
+        raise ValueError("wheel filename does not match source version")
+    if sdists[0].name != f"kube_saver-{version}.tar.gz":
+        raise ValueError("sdist filename does not match source version")
     return version
 
 
@@ -70,13 +97,14 @@ def main() -> int:
     parser.add_argument("--dist-dir", type=Path, default=Path("dist"))
     parser.add_argument("--source", type=Path, default=Path("src/kube_saver/version.py"))
     parser.add_argument("--tag", default=None)
+    parser.add_argument("--require-checksums", action="store_true")
     args = parser.parse_args()
     try:
         cli_output = subprocess.check_output(
             [sys.executable, "-m", "kube_saver.cli", "version"], text=True
         )
-        version = verify_release(args.source, args.dist_dir, cli_output, args.tag)
-    except (ValueError, OSError, KeyError, subprocess.CalledProcessError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        version = verify_release(args.source, args.dist_dir, cli_output, args.tag, require_checksums=args.require_checksums)
+    except (ValueError, SyntaxError, OSError, KeyError, subprocess.CalledProcessError, tarfile.TarError, zipfile.BadZipFile) as exc:
         print(f"Release validation failed: {exc}", file=sys.stderr)
         return 1
     print(f"Release versions agree: {version}" + (f" ({args.tag})" if args.tag else ""))
