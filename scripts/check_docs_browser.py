@@ -55,6 +55,7 @@ def check(site: Path, output: Path) -> None:
                 expect(page.get_by_role("button", name="Close navigation", exact=True)).to_have_attribute(
                     "aria-expanded", "true",
                 )
+                page.locator("label.md-nav__link").filter(has_text="Understand results").click()
                 page.get_by_role("navigation", name="Navigation", exact=True).get_by_role(
                     "link", name="GitOps review workflow", exact=True,
                 ).click()
