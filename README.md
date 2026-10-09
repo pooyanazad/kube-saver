@@ -61,12 +61,17 @@ Cost figures are projections from configured rates and a point-in-time scan. Wit
 
 ## Quick start
 
-Requires Python 3.10+ and read access to a Kubernetes cluster. Install metrics-server for measured usage and right-sizing candidates.
+PyPI package availability is not verified: its `kube-saver` endpoint returned
+HTTP 404 on 2026-10-09 UTC. This example installs the reviewed 2.0.0 source
+commit instead. See [release assets](https://github.com/pooyanazad/kube-saver/releases)
+for wheel installation when available.
+
+Requires Python 3.10+, Git for the pinned source install below, and read access to a Kubernetes cluster. Install metrics-server for measured usage and right-sizing candidates.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install kube-saver
+python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
 kube-saver doctor
 ```
 

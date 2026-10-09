@@ -30,10 +30,10 @@ Use any of:
 - `k3d cluster create kube-saver-test`
 - Docker Desktop's built-in cluster
 
-Install:
+Install the reviewed 2.0.0 source commit (requires Git):
 
 ```bash
-pip install kube-saver
+python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
 ```
 
 Or test the wheel directly:
@@ -81,10 +81,10 @@ aws eks update-kubeconfig --region us-east-1 --name production-test
 kubectl get nodes
 ```
 
-Install kube-saver as you would for a real operator:
+Install the same reviewed source commit, then check cluster access:
 
 ```bash
-pip install kube-saver
+python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
 kube-saver doctor
 ```
 

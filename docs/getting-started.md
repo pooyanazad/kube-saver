@@ -15,11 +15,28 @@ Setup time depends on cluster access, credentials, and metrics availability.
 
 ## 1. Install
 
+The PyPI `kube-saver` endpoint returned HTTP 404 on 2026-10-09 UTC.
+Install the reviewed 2.0.0 source commit below; this requires Git as well as
+Python. The full commit ID keeps the install independent of later branch changes.
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install kube-saver
+python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
 ```
+
+Alternatively, download a wheel from the selected
+[GitHub release](https://github.com/pooyanazad/kube-saver/releases), verify it
+against that release's `SHA256SUMS.txt`, and install the downloaded file:
+
+```bash
+python -m pip install ./kube_saver-2.0.0-py3-none-any.whl
+kube-saver version
+```
+
+The wheel command assumes the 2.0.0 release has been published and the wheel is
+in your current directory; it does not download an unavailable package from PyPI.
+Before publication, use the pinned source install above.
 
 From source (recommended for development):
 
@@ -165,7 +182,7 @@ For a CI artifact with self-contained HTML:
 ```yaml
 - name: Generate cost report
   run: |
-    pip install kube-saver
+    python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
     kube-saver report -o cost-report.html
 - name: Upload
   uses: actions/upload-artifact@v4
