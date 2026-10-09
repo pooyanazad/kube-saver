@@ -8,6 +8,7 @@ calls or external service dependencies.
 from __future__ import annotations
 
 import json as json_mod
+import shlex
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -68,7 +69,8 @@ def generate_pr_plan(
     # Build strategic merge patches (one per workload container). Kubernetes
     # merges the containers list by name for these built-in workload kinds,
     # preserving images, probes, sibling containers, and unrelated resources.
-    patches: list[str] = ["#!/usr/bin/env bash", "# kube-saver generated patch commands", ""]
+    patches: list[str] = ["#!/usr/bin/env bash", "set -euo pipefail", "# kube-saver generated patch commands", ""]
+    context_guard_added = False
     by_target: dict[tuple[str, str, str, str], list[Recommendation]] = {}
     for rec in recommendations:
         key = (
@@ -87,8 +89,14 @@ def generate_pr_plan(
             patches.append("")
             continue
 
+        if not context_guard_added:
+            patches.extend([
+                ': "${KUBE_SAVER_APPLY_CONTEXT:?Set KUBE_SAVER_APPLY_CONTEXT to the reviewed target context}"',
+                "",
+            ])
+            context_guard_added = True
         patches.append(f"# {target} container {container_name}")
-        patches.append(f"kubectl patch {kind.lower()} {name} -n {ns} \\")
+        patches.append(f'kubectl --context "$KUBE_SAVER_APPLY_CONTEXT" patch {shlex.quote(kind.lower())} {shlex.quote(name)} -n {shlex.quote(ns)} \\')
         container_patch: dict[str, object] = {"name": container_name}
         for rec in recs:
             res = container_patch.setdefault("resources", {})
@@ -107,7 +115,7 @@ def generate_pr_plan(
             {"spec": {"template": {"spec": {"containers": [container_patch]}}}},
             separators=(",", ":"),
         )
-        patches.append(f"  --type=strategic -p \'{patch_json}\'")
+        patches.append(f"  --type=strategic -p {shlex.quote(patch_json)}")
         patches.append("")
 
     patch_text = "\n".join(patches)
@@ -121,7 +129,8 @@ def generate_pr_plan(
         "## How to apply\n\n"
         "1. Review `summary.md`.\n"
         "2. Review `apply-patches.sh`.\n"
-        "3. Run: `bash apply-patches.sh` (in a staging cluster first!).\n"
+        "3. Set `KUBE_SAVER_APPLY_CONTEXT` to the reviewed target context.\n"
+        "4. Run: `bash apply-patches.sh` (in a staging cluster first!).\n"
     )
 
     files: dict[str, str] = {

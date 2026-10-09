@@ -330,7 +330,7 @@ def run_doctor(
                     )
                 )
                 return report
-            report.context = current_name or context or "default"
+            report.context = context or current_name or "default"
             report.checks.append(
                 CheckResult(
                     name="context",

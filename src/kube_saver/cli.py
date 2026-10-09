@@ -60,6 +60,7 @@ def _run_analysis() -> tuple[
     runtime = RuntimeCollector(
         prefer_ebpf=True,
         max_metric_age_seconds=config.runtime.max_metric_age_seconds,
+        timeouts=config.timeouts,
     )
     runtime_result = runtime.collect_all_pods(pods)
 
@@ -73,9 +74,10 @@ def _run_analysis() -> tuple[
         tier=config.provider_tier,
     )
     if config.pricing_has_custom_rates():
+        rates = config.pricing.normalized()
         pricing.set_rate(
-            cpu_per_core_hour=config.pricing.cpu_per_core_hour_usd,
-            memory_per_gb_hour=config.pricing.memory_per_gb_hour_usd,
+            cpu_per_core_hour=(rates.cpu_per_core_hour_usd if rates.cpu_per_core_hour_usd > 0 else None),
+            memory_per_gb_hour=(rates.memory_per_gb_hour_usd if rates.memory_per_gb_hour_usd > 0 else None),
         )
     cost_report = analyze_cost_waste(resource_report, pricing)
     recs = generate_recommendations(resource_report, pricing, config=config)
@@ -389,6 +391,7 @@ def doctor(context: str | None) -> None:
     from kube_saver.doctor import run_doctor
 
     config = load_config()
+    context = context or config.kubeconfig_context
     use_color = sys.stdout.isatty()
     if config.namespace_filter:
         report = run_doctor(

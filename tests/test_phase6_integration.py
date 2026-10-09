@@ -35,6 +35,7 @@ class _FakeRuntimeCollector:
         self,
         prefer_ebpf: bool = True,
         max_metric_age_seconds: float = 300.0,
+        timeouts=None,
     ) -> None:
         self.prefer_ebpf = prefer_ebpf
         self.max_metric_age_seconds = max_metric_age_seconds

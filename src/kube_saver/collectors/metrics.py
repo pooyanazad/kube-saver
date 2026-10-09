@@ -11,9 +11,14 @@ still run (they will just report all requests as "wasted").
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import InvalidOperation
 
+from urllib3.exceptions import HTTPError
+
+from kube_saver.config import TimeoutConfig
 from kube_saver.models.core import (
     ActualUsage,
     MetricSource,
@@ -26,8 +31,6 @@ logger = logging.getLogger(__name__)
 try:
     from kube_saver.collectors.k8s_client import (
         _K8S_AVAILABLE,
-        _parse_cpu_to_millicores,
-        _parse_memory_to_bytes,
     )
 except ImportError:
     _K8S_AVAILABLE = False
@@ -35,6 +38,7 @@ except ImportError:
 try:
     from kubernetes import client as k8s_client  # type: ignore[import-untyped]
     from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
+    from kubernetes.utils.quantity import parse_quantity  # type: ignore[import-untyped]
 except ImportError:
     k8s_client = None
 
@@ -57,23 +61,24 @@ class MetricSample:
     collected_at: datetime
 
 
-def _parse_collected_at(value: object, fallback: datetime) -> datetime:
-    """Parse a Metrics API timestamp, falling back to collection time."""
+def _parse_collected_at(value: object) -> datetime | None:
+    """Reject missing/invalid timestamps instead of inventing freshness."""
     if not isinstance(value, str) or not value:
-        return fallback
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return fallback
+        return None
     if parsed.tzinfo is not None:
         return parsed.astimezone(timezone.utc).replace(tzinfo=None)
-    return parsed
+    return None
 
 
 class MetricsCollector:
     """Collects actual resource usage from the Kubernetes Metrics API."""
 
-    def __init__(self) -> None:
+    def __init__(self, timeouts: TimeoutConfig | None = None) -> None:
+        self.timeouts = (timeouts or TimeoutConfig()).normalized()
         self.available: bool | None = None
         self.source: MetricSource = MetricSource.ESTIMATED
 
@@ -108,15 +113,17 @@ class MetricsCollector:
                     version="v1beta1",
                     namespace=namespace,
                     plural="pods",
+                    _request_timeout=self.timeouts.operation_seconds,
                 )
             else:
                 metrics = custom_api.list_cluster_custom_object(
                     group="metrics.k8s.io",
                     version="v1beta1",
                     plural="pods",
+                    _request_timeout=self.timeouts.operation_seconds,
                 )
             self.available = True
-        except ApiException as exc:
+        except (ApiException, HTTPError, TimeoutError, ConnectionError) as exc:
             self.available = False
             logger.warning("metrics-server not available: %s", exc)
             return {}
@@ -124,33 +131,49 @@ class MetricsCollector:
         self.source = MetricSource.METRICS_SERVER
         pod_map = {pod.name: pod for pod in pods}
         result: dict[str, ActualUsage] = {}
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
         for item in metrics.get("items", []):
             pod_name = item.get("metadata", {}).get("name", "")
             if pod_name not in pod_map:
                 continue
-            total_cpu = 0.0
-            total_mem = 0
-            sample_count = 0
-            for container in item.get("containers", []):
-                total_cpu += _parse_cpu_to_millicores(
-                    container.get("usage", {}).get("cpu")
+            pod = pod_map[pod_name]
+            entries = item.get("containers", [])
+            if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+                logger.warning("Malformed metrics for %s/%s; treating usage as unavailable", pod.namespace, pod_name)
+                pod.actual = ActualUsage(source=MetricSource.ESTIMATED)
+                continue
+            collected_at = _parse_collected_at(item.get("timestamp"))
+            expected = {container.name for container in pod.containers}
+            names = [entry.get("name") for entry in entries]
+            if expected and not all(isinstance(name, str) for name in names):
+                pod.actual = ActualUsage(source=MetricSource.ESTIMATED)
+                continue
+            if (not entries or collected_at is None
+                    or (expected and (set(names) != expected or len(names) != len(expected)))):
+                logger.warning("Incomplete metrics for %s/%s; treating usage as unavailable", pod.namespace, pod_name)
+                pod.actual = ActualUsage(source=MetricSource.ESTIMATED)
+                continue
+            try:
+                # The Kubernetes quantity parser supports micro/nano CPU as
+                # well as milli units; missing fields must not become zeros.
+                cpu_values = [float(parse_quantity(entry["usage"]["cpu"])) * 1000 for entry in entries]
+                memory_values = [float(parse_quantity(entry["usage"]["memory"])) for entry in entries]
+                if not all(math.isfinite(value) and value >= 0 for value in cpu_values + memory_values):
+                    raise ValueError("non-finite or negative usage")
+                sample = MetricSample(
+                    cpu_millicores=sum(cpu_values),
+                    memory_bytes=math.ceil(sum(memory_values)),
+                    collected_at=collected_at,
                 )
-                total_mem += _parse_memory_to_bytes(
-                    container.get("usage", {}).get("memory")
-                )
-                sample_count += 1
-            sample = MetricSample(
-                cpu_millicores=total_cpu,
-                memory_bytes=total_mem,
-                collected_at=_parse_collected_at(item.get("timestamp"), now),
-            )
+            except (ValueError, TypeError, KeyError, InvalidOperation, OverflowError):
+                logger.warning("Invalid metrics for %s/%s; treating usage as unavailable", pod.namespace, pod_name)
+                pod.actual = ActualUsage(source=MetricSource.ESTIMATED)
+                continue
             usage = ActualUsage(
                 cpu_millicores=sample.cpu_millicores,
                 memory_bytes=sample.memory_bytes,
                 source=MetricSource.METRICS_SERVER,
                 observed_at=sample.collected_at,
-                sample_count=max(sample_count, 1),
+                sample_count=len(entries),
             )
             result[pod_name] = usage
             pod_map[pod_name].actual = usage
