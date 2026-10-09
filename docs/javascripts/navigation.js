@@ -16,6 +16,9 @@ function enhanceNavigation() {
   menu.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      // Material also activates labels on Enter at the window level.
+      // Stop propagation so a single key press cannot toggle twice.
+      event.stopPropagation();
       menu.click();
     }
   });

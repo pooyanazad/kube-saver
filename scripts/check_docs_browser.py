@@ -52,9 +52,7 @@ def check(site: Path, output: Path) -> None:
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 page.get_by_role("button", name="Open navigation", exact=True).press("Enter")
                 expect(page.locator("#__drawer")).to_be_checked()
-                # Material hides the header from the accessibility tree while
-                # the drawer is open. Inspect the control without a role query.
-                expect(page.locator('header label[for="__drawer"]')).to_have_attribute(
+                expect(page.get_by_role("button", name="Close navigation", exact=True)).to_have_attribute(
                     "aria-expanded", "true",
                 )
                 page.get_by_role("navigation", name="Navigation", exact=True).get_by_role(
