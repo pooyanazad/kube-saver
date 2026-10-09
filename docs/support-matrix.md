@@ -8,18 +8,20 @@ description: Review kube-saver environment support, dated test evidence, and pla
 
 This matrix separates dated evidence from declared compatibility. **Unverified**
 means no reproducible test record was collected for that environment; it is not
-proof of incompatibility. Evidence was reviewed on 2026-10-08 UTC against
-`adef5ff`. See [dated support evidence](support-evidence.md) for links and limits.
+proof of incompatibility. The original environment evidence was reviewed on
+2026-10-08 UTC against `adef5ff`; 2.0.0 main CI was reviewed on 2026-10-09 UTC
+against `b2f0fdf`. See [dated support evidence](support-evidence.md) for links and limits.
 
 ## Python and packaging
 
 | Environment | Verification status | Evidence |
 |---|---|---|
-| Python 3.10, 3.11, 3.12 on Linux x86_64 | Unit tests and wheel CLI smoke checks passed | CI on 2026-10-08 UTC |
+| Python 3.10, 3.11, 3.12 on Linux x86_64 | Unit tests and wheel CLI smoke checks passed | CI on 2026-10-08 and 2026-10-09 UTC |
 | Python 3.13 | Declared in package metadata; unverified here | No dated 3.13 run collected |
 | Python < 3.10 | Not supported by package metadata | `requires-python = ">=3.10"` |
-| Wheel and sdist build | Verified in CI and local audit | Source reports 1.3.0; release tag identity is separate |
-| Current PyPI and Docker Hub tags | Unverified fresh-install state | Do not infer package version from a GitHub release tag |
+| Wheel and sdist build | Verified in CI and local audit | Latest reviewed source reports 2.0.0; release publication is separate |
+| PyPI package | Endpoint returned HTTP 404 on 2026-10-09 UTC | Use the pinned source install or verified GitHub release wheel |
+| Current Docker Hub tags | Unverified fresh-install state | CI tests a local image; it does not prove registry publication |
 
 ## Operating systems and architectures
 

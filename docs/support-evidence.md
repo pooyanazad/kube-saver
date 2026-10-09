@@ -10,7 +10,33 @@ Evidence reviewed on **2026-10-08 and 2026-10-09 UTC**. These records describe t
 commit, not every future release or platform. Logs may expire; retain sanitized
 artifacts when conducting future tests.
 
-## Latest main: adef5ff
+## 2.0.0 main: b2f0fdf — 2026-10-09 UTC
+
+[CI run 37931841554](https://github.com/pooyanazad/kube-saver/actions/runs/37931841554)
+passed for `b2f0fdfc54fb13621c602373b7a5b91a8d483c3f`. All eleven validation
+jobs passed; GitHub release and Docker publication jobs were skipped.
+
+- Python 3.10–3.12 unit tests passed. The
+  [3.12 log](https://github.com/pooyanazad/kube-saver/actions/runs/37931841554/job/113824207428)
+  records `387 passed` at 12:43:21 UTC.
+- Ruff, mypy, wheel/sdist build, artifact/checksum validation, and wheel CLI smoke
+  checks on Python 3.10–3.12 passed. The
+  [3.12 wheel check](https://github.com/pooyanazad/kube-saver/actions/runs/37931841554/job/113824496694)
+  records `kube-saver 2.0.0`.
+- The [Docker/kind smoke log](https://github.com/pooyanazad/kube-saver/actions/runs/37931841554/job/113824496583)
+  records CLI 2.0.0, Kubernetes server 1.30.0, and a 3,458-byte HTML report.
+  Metrics-server returned HTTP 404; doctor passed required checks with an optional
+  missing-metrics warning. This verifies API access and request-based estimates,
+  not measured right-sizing or meaningful workload savings.
+- Managed EKS/GKE/AKS, live namespace Role authorization, and representative-load
+  sizing were not run in this release preparation: no such cluster access was
+  available. Mocked tests do not establish live support for those environments.
+
+The public PyPI JSON endpoint for `kube-saver` returned HTTP 404 on this date.
+This is a dated availability observation, not proof that the package name can
+be registered. No PyPI publication or fresh Docker Hub pull was verified.
+
+## Previous main: adef5ff
 
 [CI run 37856985522](https://github.com/pooyanazad/kube-saver/actions/runs/37856985522)
 completed successfully at 2026-10-08 23:03:15 UTC for

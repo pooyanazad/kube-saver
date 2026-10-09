@@ -130,6 +130,8 @@ an existing file.
 ## Option 3: CI / GitHub Actions
 
 A native CI example, after setting up Python 3.10+ with `actions/setup-python`.
+The install uses a reviewed source commit and requires Git on the runner;
+PyPI availability has not been established.
 Here `KUBECONFIG_YAML` is a secret containing kubeconfig **contents**;
 `KUBECONFIG` must point to the file written on the runner:
 
@@ -143,7 +145,7 @@ Here `KUBECONFIG_YAML` is a secret containing kubeconfig **contents**;
     echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
 
 - name: Install kube-saver
-  run: python -m pip install kube-saver
+  run: python -m pip install "git+https://github.com/pooyanazad/kube-saver.git@b2f0fdfc54fb13621c602373b7a5b91a8d483c3f"
 
 - name: Generate report
   run: kube-saver report -o cost-report.html
