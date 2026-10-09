@@ -9,7 +9,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 
 def check(site: Path, output: Path) -> None:
@@ -33,6 +33,9 @@ def check(site: Path, output: Path) -> None:
                 page.keyboard.press("Tab")
                 assert "Skip to content" in page.locator(":focus").inner_text()
                 page.screenshot(path=str(output / "desktop.png"), full_page=True)
+                expect(page.locator(".md-search-result__meta")).to_have_text(
+                    "Type to start searching", timeout=30000,
+                )
                 page.get_by_role("textbox", name="Search", exact=True).fill("metrics-server")
                 page.locator(".md-search-result__item").first.wait_for(state="visible")
                 assert page.locator(".md-search-result__item").count() > 0

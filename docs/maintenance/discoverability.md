@@ -133,10 +133,19 @@ the corresponding console response.
 
 ## Search visibility baseline and repeat procedure
 
-The dated records in `visibility-baseline.json` are observations from the
-available search service, not Google/Bing SERP ranks or AI citations. Its
-underlying engine and user location were not exposed. A missing result means
-only **not observed in the returned set**, not globally unindexed.
+The dated records in `visibility-baseline.json` include five available search
+service observations and five direct Bing observations. The search service's
+underlying engine/location were not exposed. Bing was inspected signed out
+with an English UI; region was not verified. Record scope and rendered-card
+counts separately: these were not fixed top-20 ranking checks. kube-saver was
+not observed in the inspected sets. A missing result means only **not observed
+in the inspected set**, not globally unindexed.
+
+Google's first query reached an unusual-traffic CAPTCHA on 9 October 2026.
+No CAPTCHA attempt or bypass was made; remaining Google queries were not
+attempted. Bing displayed AI summaries for two inspected queries with no
+project mention, but source citations and separate AI search products were
+not verified. Those citation fields remain `not_tested`.
 
 Keep these exact queries unchanged for comparisons:
 
@@ -200,7 +209,8 @@ and release workflow remain unchanged in this documentation proposal.
   empty Topics, and Pages disabled. The GitHub plugin exposes no settings
   write action; browser passkey authentication did not complete. The exact
   manual steps above remain required unless settings access becomes available.
-- Five query observations are recorded with the available search service;
-  direct Google/Bing ranks and AI citations were not tested. No Search Console
+- Five search-service observations and five direct Bing observations are
+  recorded; no ranking is inferred from absence. Google was CAPTCHA-blocked,
+  and AI citations were not verified. No Search Console
   property, ownership verification, sitemap submission or live Pages indexing
   has been claimed. Publication and inspection await owner approval/access.

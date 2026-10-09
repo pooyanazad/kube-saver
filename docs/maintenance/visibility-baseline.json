@@ -15,24 +15,19 @@
       "returned_document_count": 42,
       "evidence_sample": [
         {
-          "url": "https://github.com/kubecost/cost-analyzer",
-          "reference": "turn18search0"
+          "url": "https://github.com/kubecost/cost-analyzer"
         },
         {
-          "url": "https://github.com/opencost/opencost",
-          "reference": "turn18search1"
+          "url": "https://github.com/opencost/opencost"
         },
         {
-          "url": "https://www.kubeopt.com/",
-          "reference": "turn18search2"
+          "url": "https://www.kubeopt.com/"
         },
         {
-          "url": "https://github.com/realopslabs/kubeledger",
-          "reference": "turn18search3"
+          "url": "https://github.com/realopslabs/kubeledger"
         },
         {
-          "url": "https://opencost.dev/",
-          "reference": "turn18search4"
+          "url": "https://opencost.dev/"
         }
       ]
     },
@@ -50,24 +45,19 @@
       "returned_document_count": 31,
       "evidence_sample": [
         {
-          "url": "https://github.com/kubecost/kubectl-cost",
-          "reference": "turn17search0"
+          "url": "https://github.com/kubecost/kubectl-cost"
         },
         {
-          "url": "https://github.com/elft/KubeSqueeze",
-          "reference": "turn17search1"
+          "url": "https://github.com/elft/KubeSqueeze"
         },
         {
-          "url": "https://www.npmjs.com/package/%40kubeopt/cli",
-          "reference": "turn17search2"
+          "url": "https://www.npmjs.com/package/%40kubeopt/cli"
         },
         {
-          "url": "https://www.kubeopt.com/",
-          "reference": "turn17search3"
+          "url": "https://www.kubeopt.com/"
         },
         {
-          "url": "https://github.com/bharats487/kubernetes-cost-optimization-platform",
-          "reference": "turn17search4"
+          "url": "https://github.com/bharats487/kubernetes-cost-optimization-platform"
         }
       ]
     },
@@ -85,24 +75,19 @@
       "returned_document_count": 35,
       "evidence_sample": [
         {
-          "url": "https://www.cloudkeeper.com/cloudkeeper-kubernetes-tuner",
-          "reference": "turn21search0"
+          "url": "https://www.cloudkeeper.com/cloudkeeper-kubernetes-tuner"
         },
         {
-          "url": "https://github.com/kruize/autotune",
-          "reference": "turn21search1"
+          "url": "https://github.com/kruize/autotune"
         },
         {
-          "url": "https://zesty.co/",
-          "reference": "turn21search2"
+          "url": "https://zesty.co/"
         },
         {
-          "url": "https://artifacthub.io/packages/helm/right-sizer/right-sizer",
-          "reference": "turn21search3"
+          "url": "https://artifacthub.io/packages/helm/right-sizer/right-sizer"
         },
         {
-          "url": "https://kruize.github.io/kruize-website/docs/",
-          "reference": "turn21search4"
+          "url": "https://kruize.github.io/kruize-website/docs/"
         }
       ]
     },
@@ -120,24 +105,19 @@
       "returned_document_count": 32,
       "evidence_sample": [
         {
-          "url": "https://kubecost.github.io/cost-analyzer/",
-          "reference": "turn20search0"
+          "url": "https://kubecost.github.io/cost-analyzer/"
         },
         {
-          "url": "https://github.com/grafana/Kost",
-          "reference": "turn20search1"
+          "url": "https://github.com/grafana/Kost"
         },
         {
-          "url": "https://grafana.com/grafana/dashboards/15877",
-          "reference": "turn20search2"
+          "url": "https://grafana.com/grafana/dashboards/15877"
         },
         {
-          "url": "https://github.com/opencost/opencost",
-          "reference": "turn20search3"
+          "url": "https://github.com/opencost/opencost"
         },
         {
-          "url": "https://github.com/realopslabs/kubeledger",
-          "reference": "turn20search4"
+          "url": "https://github.com/realopslabs/kubeledger"
         }
       ]
     },
@@ -155,26 +135,123 @@
       "returned_document_count": 30,
       "evidence_sample": [
         {
-          "url": "https://costmon.com/kubernetes-waste-analyzer",
-          "reference": "turn19search0"
+          "url": "https://costmon.com/kubernetes-waste-analyzer"
         },
         {
-          "url": "https://github.com/yonahd/kor",
-          "reference": "turn19search1"
+          "url": "https://github.com/yonahd/kor"
         },
         {
-          "url": "https://www.kubeopt.com/",
-          "reference": "turn19search2"
+          "url": "https://www.kubeopt.com/"
         },
         {
-          "url": "https://yonahd.github.io/kor/",
-          "reference": "turn19search3"
+          "url": "https://yonahd.github.io/kor/"
         },
         {
-          "url": "https://wastage.expanse.sh/",
-          "reference": "turn19search4"
+          "url": "https://wastage.expanse.sh/"
         }
       ]
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Bing",
+      "query": "open source Kubernetes cost analyzer",
+      "search_url": "https://www.bing.com/search?q=open+source+Kubernetes+cost+analyzer",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "locale": "English UI; region not verified",
+      "device": "Cloud desktop browser, signed out; optional cookies rejected",
+      "scope": "Loaded first-page organic cards at capture; ads excluded. Not a fixed top-20 ranking audit.",
+      "observed_organic_cards": 8,
+      "appearance": "not_observed_in_inspected_cards",
+      "observed_rank": null,
+      "bing_serp_ai_summary_present": true,
+      "bing_serp_ai_summary_project_mentioned": false,
+      "ai_citation": "not_tested",
+      "notes": "A dated limited observation, not proof of global absence, non-indexing, or future visibility."
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Bing",
+      "query": "Kubernetes cost optimization CLI",
+      "search_url": "https://www.bing.com/search?q=Kubernetes%20cost%20optimization%20CLI",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "locale": "English UI; region not verified",
+      "device": "Cloud desktop browser, signed out; optional cookies rejected",
+      "scope": "Loaded first-page organic cards at capture; ads excluded. Not a fixed top-20 ranking audit.",
+      "observed_organic_cards": 4,
+      "appearance": "not_observed_in_inspected_cards",
+      "observed_rank": null,
+      "bing_serp_ai_summary_present": false,
+      "bing_serp_ai_summary_project_mentioned": null,
+      "ai_citation": "not_tested",
+      "notes": "A dated limited observation, not proof of global absence, non-indexing, or future visibility."
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Bing",
+      "query": "Kubernetes right-sizing tool",
+      "search_url": "https://www.bing.com/search?q=Kubernetes%20right-sizing%20tool",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "locale": "English UI; region not verified",
+      "device": "Cloud desktop browser, signed out; optional cookies rejected",
+      "scope": "Loaded first-page organic cards at capture; ads excluded. Not a fixed top-20 ranking audit.",
+      "observed_organic_cards": 3,
+      "appearance": "not_observed_in_inspected_cards",
+      "observed_rank": null,
+      "bing_serp_ai_summary_present": true,
+      "bing_serp_ai_summary_project_mentioned": false,
+      "ai_citation": "not_tested",
+      "notes": "A dated limited observation, not proof of global absence, non-indexing, or future visibility."
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Bing",
+      "query": "offline Kubernetes cost report",
+      "search_url": "https://www.bing.com/search?q=offline%20Kubernetes%20cost%20report",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "locale": "English UI; region not verified",
+      "device": "Cloud desktop browser, signed out; optional cookies rejected",
+      "scope": "Loaded first-page organic cards at capture; ads excluded. Not a fixed top-20 ranking audit.",
+      "observed_organic_cards": 4,
+      "appearance": "not_observed_in_inspected_cards",
+      "observed_rank": null,
+      "bing_serp_ai_summary_present": false,
+      "bing_serp_ai_summary_project_mentioned": null,
+      "ai_citation": "not_tested",
+      "notes": "A dated limited observation, not proof of global absence, non-indexing, or future visibility."
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Bing",
+      "query": "Kubernetes resource waste analyzer",
+      "search_url": "https://www.bing.com/search?q=Kubernetes%20resource%20waste%20analyzer",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "locale": "English UI; region not verified",
+      "device": "Cloud desktop browser, signed out; optional cookies rejected",
+      "scope": "Loaded first-page organic cards at capture; ads excluded. Not a fixed top-20 ranking audit.",
+      "observed_organic_cards": 5,
+      "appearance": "not_observed_in_inspected_cards",
+      "observed_rank": null,
+      "bing_serp_ai_summary_present": false,
+      "bing_serp_ai_summary_project_mentioned": null,
+      "ai_citation": "not_tested",
+      "notes": "A dated limited observation, not proof of global absence, non-indexing, or future visibility."
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "UTC",
+      "engine": "Google",
+      "query": "open source Kubernetes cost analyzer",
+      "requested_search_url": "https://www.google.com/search?q=open+source+Kubernetes+cost+analyzer",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "appearance": "blocked",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "Google showed an unusual-traffic CAPTCHA. No challenge was attempted. Other Google queries were not attempted."
     }
   ]
 }
