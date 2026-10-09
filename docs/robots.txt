@@ -1,0 +1,5 @@
+# Informational on a GitHub Pages project site: crawlers read /robots.txt
+# at the host root, not /kube-saver/robots.txt. See the maintenance runbook.
+User-agent: *
+Allow: /kube-saver/
+Sitemap: https://pooyanazad.github.io/kube-saver/sitemap.xml

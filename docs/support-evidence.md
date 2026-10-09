@@ -1,3 +1,9 @@
+---
+title: Dated support test evidence
+description: Inspect recorded source revisions, Python checks, wheel smoke tests, and Docker kind evidence with
+  explicit limits on measured and platform coverage.
+---
+
 # Dated support evidence
 
 Evidence reviewed on **2026-10-08 and 2026-10-09 UTC**. These records describe the tested

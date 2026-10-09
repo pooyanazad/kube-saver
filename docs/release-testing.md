@@ -1,3 +1,9 @@
+---
+title: Release testing procedure
+description: Validate kube-saver builds, CLI output, Kubernetes report collection, restricted access, and recorded
+  evidence before an approved release.
+---
+
 # Pre-release environment testing
 
 kube-saver needs to be tested against three different cluster environments

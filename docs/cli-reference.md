@@ -1,3 +1,9 @@
+---
+title: CLI reference
+description: Supported kube-saver commands, flags, output files, exit codes, local HTTP API routes, and selected
+  Python exporter helpers.
+---
+
 # CLI reference
 
 Commands, supported flags, and selected Python helpers from the source checkout.

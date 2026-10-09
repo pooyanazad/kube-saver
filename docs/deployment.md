@@ -1,3 +1,9 @@
+---
+title: Containers and CI deployment
+description: Run kube-saver with mounted kubeconfig, in-cluster credentials, persistent report output, and CI artifacts
+  while understanding container authentication limits.
+---
+
 # Running kube-saver inside a container
 
 Three options for running kube-saver with the official Docker image, depending on where your kubeconfig lives.

@@ -1,3 +1,9 @@
+---
+title: Local outputs and offline report viewing
+description: Understand self-contained kube-saver HTML reports, local change plans and notifications, and when Kubernetes
+  API connectivity is still required.
+---
+
 # Self-contained outputs
 
 kube-saver produces portable report and review files without a maintainer-operated

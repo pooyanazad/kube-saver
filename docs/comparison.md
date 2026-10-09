@@ -1,3 +1,9 @@
+---
+title: Comparison with OpenCost, Goldilocks and VPA
+description: Compare kube-saver local snapshots and review files with OpenCost cost allocation, Goldilocks dashboards,
+  VPA recommendations, and k9s cluster navigation.
+---
+
 # kube-saver and other Kubernetes tools
 
 Choose by the data model and workflow you need. kube-saver offers local snapshots

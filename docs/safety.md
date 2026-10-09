@@ -1,3 +1,9 @@
+---
+title: Recommendation and right-sizing safety
+description: Understand current-sample recommendation guardrails, exclusions, confidence limits, explicit patch
+  context, and read-only Kubernetes collection.
+---
+
 # Safety & trust
 
 This document explains what kube-saver will never do, how it protects your workloads, and what you need to know before running it in a production environment.
@@ -18,7 +24,7 @@ This document explains what kube-saver will never do, how it protects your workl
 - Auto-apply resource changes to your cluster
 - Modify any Kubernetes object without your explicit action
 - Require sending scan data to a hosted kube-saver service
-- Require a cloud account, token, or hosted backend
+- Require a cloud billing account or hosted kube-saver backend (cluster credentials are still required)
 - Require metrics-server for request-based reports
 - Generate a right-sizing recommendation from request-only estimates
 

@@ -1,3 +1,9 @@
+---
+title: Installation and first report
+description: Install kube-saver, authenticate to Kubernetes, check metrics-server and read permissions, and generate
+  your first local HTML cost report.
+---
+
 # Getting started
 
 This guide walks you from a fresh install to your first kube-saver output on the four most common cluster types.

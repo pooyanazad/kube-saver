@@ -1,3 +1,9 @@
+---
+title: Support matrix and verification limits
+description: Review kube-saver environment support, dated test evidence, and platforms or deployment paths that
+  remain unverified.
+---
+
 # Support matrix and verification status
 
 This matrix separates dated evidence from declared compatibility. **Unverified**

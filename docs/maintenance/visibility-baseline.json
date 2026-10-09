@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "date": "2026-10-09",
+      "timezone": "Europe/Stockholm",
+      "engine": "Available web search service, system2 (underlying provider not exposed)",
+      "query": "open source Kubernetes cost analyzer",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "scope": "Returned result set; not a direct Google or Bing SERP",
+      "appearance": "not_observed_in_returned_set",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "No kube-saver or pooyanazad mention in the returned result text. This is not proof of global absence or non-indexing.",
+      "returned_document_count": 42,
+      "evidence_sample": [
+        {
+          "url": "https://github.com/kubecost/cost-analyzer",
+          "reference": "turn18search0"
+        },
+        {
+          "url": "https://github.com/opencost/opencost",
+          "reference": "turn18search1"
+        },
+        {
+          "url": "https://www.kubeopt.com/",
+          "reference": "turn18search2"
+        },
+        {
+          "url": "https://github.com/realopslabs/kubeledger",
+          "reference": "turn18search3"
+        },
+        {
+          "url": "https://opencost.dev/",
+          "reference": "turn18search4"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "Europe/Stockholm",
+      "engine": "Available web search service, system2 (underlying provider not exposed)",
+      "query": "Kubernetes cost optimization CLI",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "scope": "Returned result set; not a direct Google or Bing SERP",
+      "appearance": "not_observed_in_returned_set",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "No kube-saver or pooyanazad mention in the returned result text. This is not proof of global absence or non-indexing.",
+      "returned_document_count": 31,
+      "evidence_sample": [
+        {
+          "url": "https://github.com/kubecost/kubectl-cost",
+          "reference": "turn17search0"
+        },
+        {
+          "url": "https://github.com/elft/KubeSqueeze",
+          "reference": "turn17search1"
+        },
+        {
+          "url": "https://www.npmjs.com/package/%40kubeopt/cli",
+          "reference": "turn17search2"
+        },
+        {
+          "url": "https://www.kubeopt.com/",
+          "reference": "turn17search3"
+        },
+        {
+          "url": "https://github.com/bharats487/kubernetes-cost-optimization-platform",
+          "reference": "turn17search4"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "Europe/Stockholm",
+      "engine": "Available web search service, system2 (underlying provider not exposed)",
+      "query": "Kubernetes right-sizing tool",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "scope": "Returned result set; not a direct Google or Bing SERP",
+      "appearance": "not_observed_in_returned_set",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "No kube-saver or pooyanazad mention in the returned result text. This is not proof of global absence or non-indexing.",
+      "returned_document_count": 35,
+      "evidence_sample": [
+        {
+          "url": "https://www.cloudkeeper.com/cloudkeeper-kubernetes-tuner",
+          "reference": "turn21search0"
+        },
+        {
+          "url": "https://github.com/kruize/autotune",
+          "reference": "turn21search1"
+        },
+        {
+          "url": "https://zesty.co/",
+          "reference": "turn21search2"
+        },
+        {
+          "url": "https://artifacthub.io/packages/helm/right-sizer/right-sizer",
+          "reference": "turn21search3"
+        },
+        {
+          "url": "https://kruize.github.io/kruize-website/docs/",
+          "reference": "turn21search4"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "Europe/Stockholm",
+      "engine": "Available web search service, system2 (underlying provider not exposed)",
+      "query": "offline Kubernetes cost report",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "scope": "Returned result set; not a direct Google or Bing SERP",
+      "appearance": "not_observed_in_returned_set",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "No kube-saver or pooyanazad mention in the returned result text. This is not proof of global absence or non-indexing.",
+      "returned_document_count": 32,
+      "evidence_sample": [
+        {
+          "url": "https://kubecost.github.io/cost-analyzer/",
+          "reference": "turn20search0"
+        },
+        {
+          "url": "https://github.com/grafana/Kost",
+          "reference": "turn20search1"
+        },
+        {
+          "url": "https://grafana.com/grafana/dashboards/15877",
+          "reference": "turn20search2"
+        },
+        {
+          "url": "https://github.com/opencost/opencost",
+          "reference": "turn20search3"
+        },
+        {
+          "url": "https://github.com/realopslabs/kubeledger",
+          "reference": "turn20search4"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-09",
+      "timezone": "Europe/Stockholm",
+      "engine": "Available web search service, system2 (underlying provider not exposed)",
+      "query": "Kubernetes resource waste analyzer",
+      "target_url": "https://github.com/pooyanazad/kube-saver",
+      "scope": "Returned result set; not a direct Google or Bing SERP",
+      "appearance": "not_observed_in_returned_set",
+      "observed_rank": null,
+      "ai_citation": "not_tested",
+      "notes": "No kube-saver or pooyanazad mention in the returned result text. This is not proof of global absence or non-indexing.",
+      "returned_document_count": 30,
+      "evidence_sample": [
+        {
+          "url": "https://costmon.com/kubernetes-waste-analyzer",
+          "reference": "turn19search0"
+        },
+        {
+          "url": "https://github.com/yonahd/kor",
+          "reference": "turn19search1"
+        },
+        {
+          "url": "https://www.kubeopt.com/",
+          "reference": "turn19search2"
+        },
+        {
+          "url": "https://yonahd.github.io/kor/",
+          "reference": "turn19search3"
+        },
+        {
+          "url": "https://wastage.expanse.sh/",
+          "reference": "turn19search4"
+        }
+      ]
+    }
+  ]
+}
