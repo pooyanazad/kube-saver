@@ -6,7 +6,9 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'requirements-docs.txt'
+      - 'requirements-docs-browser.txt'
       - 'scripts/validate_docs_site.py'
+      - 'scripts/check_docs_browser.py'
       - '.github/workflows/docs.yml'
   push:
     branches: [main]
@@ -14,7 +16,9 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'requirements-docs.txt'
+      - 'requirements-docs-browser.txt'
       - 'scripts/validate_docs_site.py'
+      - 'scripts/check_docs_browser.py'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
     inputs:
@@ -51,6 +55,20 @@ jobs:
         run: python -m mkdocs build --strict
       - name: Validate generated site
         run: python scripts/validate_docs_site.py site
+      - name: Install browser for documentation interaction checks
+        run: |
+          python -m pip install -r requirements-docs-browser.txt
+          python -m playwright install --with-deps chromium
+      - name: Check desktop and mobile interactions
+        run: python scripts/check_docs_browser.py site --output "$RUNNER_TEMP/docs-browser-evidence"
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: documentation-browser-evidence
+          path: ${{ runner.temp }}/docs-browser-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload preview for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

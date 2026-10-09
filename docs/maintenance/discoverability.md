@@ -25,6 +25,19 @@ does not publish on a push, PR, or merge. Runtime CI remains separate.
 Historical screenshot plans and reports are excluded from the built site;
 they are not current executable examples or extra indexable pages.
 
+The workflow also checks desktop search, keyboard skip navigation, eight
+priority pages, and mobile drawer/viewport behavior using Chromium. It saves
+desktop/mobile screenshots as `documentation-browser-evidence`. To run these
+optional checks locally where a browser can launch:
+
+```bash
+python -m pip install -r requirements-docs-browser.txt
+python -m playwright install chromium
+python scripts/check_docs_browser.py site --output ../docs-browser-evidence
+```
+
+Automated checks do not replace visual review or a complete accessibility audit.
+
 MkDocs and Material (9.7.7) are pinned in `requirements-docs.txt`. Material 9.7 entered
 maintenance in November 2025, with critical fixes/security updates promised
 for at least 12 months. Review upstream maintenance status before November
