@@ -367,6 +367,33 @@ def _safe_get(d: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return d
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge *override* into *base*, returning a new dict.
+
+    Rules:
+    - If both values are mappings, merge them recursively so that setting one
+      nested key does not erase its siblings.
+    - If the override value is a list (or any non-mapping), it *replaces* the
+      base value entirely — lists are never concatenated.
+    - A ``None`` override value removes the key from the result (the caller
+      can rely on ``_build_config`` defaults for missing keys).
+    - Scalar values in *override* always win over *base*.
+
+    This preserves the env > local > global > default precedence: callers layer
+    global first, then local on top, then env vars are applied separately.
+    """
+    result: dict[str, Any] = dict(base)
+    for key, override_val in override.items():
+        if override_val is None:
+            # Explicit null: remove the key so the builder falls back to defaults.
+            result.pop(key, None)
+        elif isinstance(override_val, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], override_val)
+        else:
+            result[key] = override_val
+    return result
+
+
 def _build_config(raw: dict[str, Any]) -> KubeSaverConfig:
     """Convert a flat YAML dict into a ``KubeSaverConfig``."""
     provider_str = raw.get("cloud_provider", "unknown")
@@ -673,4 +700,5 @@ __all__ = [
     "load_config",
     "default_config_yaml",
     "ENV_PREFIX",
+    "_deep_merge",
 ]
