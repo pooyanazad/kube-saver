@@ -590,6 +590,14 @@ def load_config(
         3. Global config file (``~/.kube-saver/config.yaml``)
         4. Built-in defaults
 
+    Nested mappings (e.g. ``timeouts``, ``pricing``, ``alerts``) are merged
+    key-by-key rather than replaced wholesale.  This means a local file that
+    sets only ``timeouts.read_seconds: 7`` will *not* reset
+    ``timeouts.connect_seconds`` to its default — the global value is
+    preserved.  Lists are replaced entirely (never concatenated).  An explicit
+    YAML ``null`` value removes the key so the builder falls back to its
+    built-in default.
+
     Args:
         global_path: Override for global config path.
         local_path: Override for local config path.
@@ -605,15 +613,17 @@ def load_config(
     # Layer 1: global
     if gpath.is_file() and _YAML_AVAILABLE:
         try:
-            raw.update(yaml.safe_load(gpath.read_text()) or {})
+            global_raw = yaml.safe_load(gpath.read_text()) or {}
+            raw = _deep_merge(raw, global_raw)
             logger.debug("Loaded global config from %s", gpath)
         except Exception as exc:
             logger.warning("Error reading global config %s: %s", gpath, exc)
 
-    # Layer 2: local (overrides global)
+    # Layer 2: local (overrides global, nested keys merged)
     if lpath.is_file() and _YAML_AVAILABLE:
         try:
-            raw.update(yaml.safe_load(lpath.read_text()) or {})
+            local_raw = yaml.safe_load(lpath.read_text()) or {}
+            raw = _deep_merge(raw, local_raw)
             logger.debug("Loaded local config from %s", lpath)
         except Exception as exc:
             logger.warning("Error reading local config %s: %s", lpath, exc)
