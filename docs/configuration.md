@@ -27,6 +27,48 @@ Generate a full default config:
 python3 -c "from kube_saver.config import default_config_yaml; print(default_config_yaml())" > .kube-saver.yaml
 ```
 
+### How nested sections are merged
+
+Nested YAML mappings (such as `timeouts`, `pricing`, `alerts`, `tui`, `retries`)
+are merged **key-by-key**, not replaced wholesale.  This means you only have to
+repeat the keys you want to change:
+
+```yaml
+# ~/.kube-saver/config.yaml   (global)
+timeouts:
+  connect_seconds: 9    # custom — slow corporate proxy
+  read_seconds: 30      # default
+
+# .kube-saver.yaml            (local project override)
+timeouts:
+  read_seconds: 7       # only this key changes
+  # connect_seconds is NOT listed → global value 9 is preserved
+```
+
+After merging, the effective config is `connect_seconds: 9`, `read_seconds: 7`,
+`operation_seconds: 60` (built-in default for the unset key).
+
+The same rule applies to `pricing`, `alerts`, `tui`, `export`, `runtime`, and
+`retries`.
+
+#### Lists are replaced, not concatenated
+
+If a section contains a list (e.g. `retries.retryable_status_codes`) and the
+local file supplies a new list, the local list replaces the global one entirely.
+
+#### Setting a key to `null` resets to built-in default
+
+An explicit YAML `null` removes the key from the merged result so the builder
+falls back to its compiled-in default:
+
+```yaml
+# local file: forget the global connect_seconds and use the default (10 s)
+timeouts:
+  connect_seconds: null
+```
+
+Environment variables always override both config files regardless of merge order.
+
 ---
 
 ## Pricing
