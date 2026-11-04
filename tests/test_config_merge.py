@@ -11,17 +11,14 @@ Covers:
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
 from kube_saver.config import (
     _deep_merge,
-    _build_config,
     load_config,
 )
-
 
 # ── _deep_merge unit tests ─────────────────────────────────────────────────
 
