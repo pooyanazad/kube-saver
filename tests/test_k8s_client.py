@@ -28,9 +28,34 @@ class TestParseCpu:
         assert _parse_cpu_to_millicores("0.5") == 500.0
         assert _parse_cpu_to_millicores("2.5") == 2500.0
 
-    def test_empty_returns_zero(self) -> None:
-        assert _parse_cpu_to_millicores(None) == 0.0
-        assert _parse_cpu_to_millicores("") == 0.0
+    @pytest.mark.parametrize(("value", "expected"), [
+        ("2000m", 2000.0), ("0", 0.0), ("0m", 0.0),
+        ("500u", 0.5), ("1u", 0.001),
+        ("500n", 0.0005), ("1n", 0.000001),
+        ("1k", 1_000_000.0), ("1Ki", 1_024_000.0),
+        ("1e-3", 1.0), (" 500m ", 500.0),
+    ])
+    def test_quantity_units(self, value: str, expected: float) -> None:
+        assert _parse_cpu_to_millicores(value) == pytest.approx(expected)
+
+    @pytest.mark.parametrize("value", [None, "", " ", "\t\n"])
+    def test_empty_returns_zero(self, value: str | None, caplog) -> None:
+        assert _parse_cpu_to_millicores(value) == 0.0
+        assert not caplog.records
+
+    @pytest.mark.parametrize("value", [
+        "abc m", "abcm", "abcn", "abcu", "m", "n", "u", "500mm", "500mu",
+        "500nm", "500x", "1ki", "1.2.3", "--1", "-1", "-500m", "-500u",
+        "-500n", "-1e-9999", "NaN", "NaNm", "sNaN", "Infinity", "-Infinity",
+        "inf", "infm", "1e309", "1e306", "1e999999m", "1e1000000k",
+        "1e999999999999999999999",
+    ])
+    def test_invalid_returns_zero_with_warning(self, value: str, caplog) -> None:
+        assert _parse_cpu_to_millicores(value) == 0.0
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "CPU value" in caplog.records[0].message
+        assert repr(value) in caplog.records[0].message
 
 
 class TestParseMemory:
