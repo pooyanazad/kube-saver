@@ -11,6 +11,7 @@ import pytest
 from kube_saver.collectors.k8s_client import (
     ApiException,
     K8sClient,
+    _extract_resource_quantities,
     _parse_cpu_to_millicores,
     _parse_memory_to_bytes,
 )
@@ -56,6 +57,31 @@ class TestParseCpu:
         assert caplog.records[0].levelname == "WARNING"
         assert "CPU value" in caplog.records[0].message
         assert repr(value) in caplog.records[0].message
+
+
+@pytest.mark.parametrize("as_object", [False, True])
+@pytest.mark.parametrize(("cpu_request", "cpu_limit", "expected_request", "expected_limit"), [
+    ("500u", "500n", 0.5, 0.0005),
+    ("abc m", "-1", 0.0, 0.0),
+    ("NaN", "1e306", 0.0, 0.0),
+    (None, "", 0.0, 0.0),
+])
+def test_extract_cpu_requests_and_limits(
+    as_object: bool, cpu_request: str | None, cpu_limit: str | None,
+    expected_request: float, expected_limit: float,
+) -> None:
+    spec = {
+        "requests": {"cpu": cpu_request, "memory": "256Mi"},
+        "limits": {"cpu": cpu_limit, "memory": "1Gi"},
+    }
+    resource_spec = SimpleNamespace(**spec) if as_object else spec
+
+    quantities = _extract_resource_quantities(resource_spec)
+
+    assert quantities.cpu_millicores_request == pytest.approx(expected_request)
+    assert quantities.cpu_millicores_limit == pytest.approx(expected_limit)
+    assert quantities.memory_bytes_request == 256 * 1024**2
+    assert quantities.memory_bytes_limit == 1024**3
 
 
 class TestParseMemory:
