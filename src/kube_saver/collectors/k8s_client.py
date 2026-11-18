@@ -10,8 +10,10 @@ rather than crashing the entire scan.
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import dataclass, field
+from decimal import DecimalException
 from pathlib import Path
 
 from kube_saver.collectors.retry import _reason, retry_call
@@ -48,6 +50,7 @@ try:
     from kubernetes import client as k8s_client  # type: ignore[import-untyped]
     from kubernetes import config as k8s_config
     from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
+    from kubernetes.utils.quantity import parse_quantity  # type: ignore[import-untyped]
 
     _K8S_AVAILABLE = True
 except ImportError:
@@ -65,19 +68,25 @@ except ImportError:
 def _parse_cpu_to_millicores(value: str | None) -> float:
     """Convert a Kubernetes CPU quantity string to millicores.
 
-    Supports: '500m', '0.5', '2', '2000m', '2.5'.
-    Returns 0.0 for empty/None or unparseable values.
+    Supports Kubernetes quantity units, including millicores, micro/nanocores,
+    and plain or fractional cores.
+    Returns 0.0 for empty/None values. Invalid, negative, non-finite, or
+    overflowing values return 0.0 with a warning.
     """
     if not value:
         return 0.0
     value = str(value).strip()
-    if value.endswith("m"):
-        return float(value[:-1])
-    if value.endswith("n"):
-        return float(value[:-1]) / 1_000_000
+    if not value:
+        return 0.0
     try:
-        return float(value) * 1000
-    except ValueError:
+        quantity = parse_quantity(value)
+        if not quantity.is_finite() or quantity < 0:
+            raise ValueError("CPU quantity must be finite and non-negative")
+        millicores = float(quantity) * 1000
+        if not math.isfinite(millicores):
+            raise ValueError("CPU quantity overflows millicores")
+        return millicores
+    except (ValueError, TypeError, DecimalException, OverflowError):
         logger.warning("Unparseable CPU value: %r", value)
         return 0.0
 
