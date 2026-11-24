@@ -232,6 +232,9 @@ jobs:
         with:
           context: .
           push: false
+          pull: true
+          # Refresh OS patches and Python dependencies even when the base digest is unchanged.
+          no-cache-filters: runtime
           tags: kube-saver:smoke
           load: true
           labels: |
@@ -245,6 +248,12 @@ jobs:
             org.opencontainers.image.licenses=MIT
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Scan the exact image before smoke tests and artifact export
+        uses: ./.github/actions/scan-image
+        with:
+          image-ref: kube-saver:smoke
+          artifact-name: image-security-ci
 
       - name: Verify labels on the tested image
         env:
@@ -443,6 +452,12 @@ jobs:
 
       - name: Load the exact image that passed kind smoke checks
         run: gzip -dc tested-image/smoke-image.tar.gz | docker load
+
+      - name: Recheck security before release publication
+        uses: ./.github/actions/scan-image
+        with:
+          image-ref: kube-saver:smoke
+          artifact-name: image-security-release
 
       - name: Login to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3

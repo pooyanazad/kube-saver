@@ -1,0 +1,51 @@
+name: Scan the tested image
+description: Save a complete Trivy report and reject fixable high or critical vulnerabilities.
+
+inputs:
+  image-ref:
+    description: Image already loaded into the local Docker daemon
+    required: true
+  artifact-name:
+    description: Unique name for the complete security report
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Scan all vulnerabilities in the local image
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      env:
+        TRIVY_IMAGE_SRC: docker
+      with:
+        version: v0.76.2
+        image-ref: ${{ inputs.image-ref }}
+        scanners: vuln
+        format: json
+        output: trivy-image-report.json
+        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        exit-code: '0'
+        timeout: 15m
+
+    - name: Save the complete security report
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: trivy-image-report.json
+        retention-days: 14
+
+    - name: Reject fixable high and critical vulnerabilities
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      env:
+        TRIVY_IMAGE_SRC: docker
+        TRIVY_SKIP_DB_UPDATE: 'true'
+      with:
+        skip-setup-trivy: 'true'
+        cache: 'false'
+        image-ref: ${{ inputs.image-ref }}
+        scanners: vuln
+        format: table
+        severity: HIGH,CRITICAL
+        ignore-unfixed: 'true'
+        exit-code: '1'
+        timeout: 15m

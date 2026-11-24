@@ -38,7 +38,8 @@ concurrency:
 jobs:
   build:
     name: Build and validate documentation
-    runs-on: ubuntu-latest
+    # Playwright 1.58 supports Ubuntu 24.04, but not the moving latest runner.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

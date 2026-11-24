@@ -1,0 +1,7 @@
+# Security floors for the container's transitive Python dependencies.
+# These do not add packages or change the library's supported dependency ranges.
+# Keep the Trivy publication check enabled when updating these floors.
+certifi>=2026.10.18
+oauthlib>=4.0.1
+pyasn1>=0.6.5
+urllib3>=2.8.0
