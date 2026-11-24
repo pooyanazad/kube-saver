@@ -74,6 +74,29 @@ This script only reads local files and invokes the version command. It does not
 create a tag, upload assets, or contact a publishing API.
 ## Artifact Hub image metadata
 
+### Container security checks
+
+The Docker build pulls the current Python 3.12 Debian trixie base and bypasses
+the runtime-stage build cache to refresh OS security patches and Python
+dependencies. `constraints-image.txt` sets minimum fixed versions for affected
+transitive dependencies in the image. The runtime checks dependency consistency,
+then removes pip and its bundled dependencies, including the unused ensurepip
+bootstrap wheel. Installing additional packages inside the final image requires
+a separate build.
+
+The shared image scan action runs Trivy 0.76.2 against the local image, keeps a
+complete JSON report as a 14-day workflow artifact, and fails on HIGH or CRITICAL
+findings with an available fix. Unfixed and lower-severity findings remain in the
+complete report for review. Scanner or database-download errors fail the check;
+they are not treated as a clean report. A passing check is not a claim that the
+image has no vulnerabilities.
+
+CI scans before exporting the tested image. Release Docker publication and both
+metadata-image validation and publication scan the downloaded image again with
+the current vulnerability database. This catches newly disclosed issues between
+the build and publication, including time spent waiting for environment approval.
+No new image, release, or tag is published automatically by these checks.
+
 CI stamps the tested image with its actual build-start timestamp, exact source
 commit, package version, MIT license, description, documentation URL, and a raw
 README URL pinned to that source commit. Image-label validation runs before the

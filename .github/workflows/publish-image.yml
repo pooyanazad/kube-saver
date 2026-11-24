@@ -62,6 +62,11 @@ jobs:
           [[ "$(docker run --rm kube-saver:smoke version)" == "kube-saver $image_version" ]]
           docker image inspect kube-saver:smoke --format '{{json .Config.Labels}}' > labels.json
           python -m scripts.verify_image_metadata labels.json --version "$image_version" --revision "$GITHUB_SHA"
+      - name: Check security of the downloaded image
+        uses: ./.github/actions/scan-image
+        with:
+          image-ref: kube-saver:smoke
+          artifact-name: image-security-metadata-validation
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-metadata-image
@@ -75,12 +80,21 @@ jobs:
     runs-on: ubuntu-latest
     environment: docker-hub
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: verified-metadata-image
           path: tested-image
       - name: Load verified image
         run: gzip -dc tested-image/smoke-image.tar.gz | docker load
+      - name: Recheck security after publication approval
+        uses: ./.github/actions/scan-image
+        with:
+          image-ref: kube-saver:smoke
+          artifact-name: image-security-metadata-publication
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
